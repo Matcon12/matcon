@@ -1,0 +1,31 @@
+<!-- to check if i can retreive the data  -->
+<!-- file not needed for the project -->
+{% extends 'base_template.html' %} {% block content %}
+<h1>All Data</h1>
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice Number</th>
+        <th>Invoice Date</th>
+        <th>Product Code</th>
+        <th>Product Description</th>
+        <th>Pack Size</th>
+        <th>Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td>{{ invoice.invoice_no }}</td>
+        <td>{{invoice.invoice_date}}</td>
+        <td>{{ invoice.product_code }}</td>
+        <td>{{invoice.product_description}}</td>
+        <td>{{invoice.pack_size}}</td>
+        <td>{{invoice.quantity}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+.homepage-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* .homepage-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 50px;
+  height: fit-content;
+} */
+
+.homepage-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 50px;
+  max-width: 800px;
+  width: 100%;
+}

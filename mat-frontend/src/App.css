@@ -1,0 +1,17 @@
+/* .sidebar-and-content {
+  display: flex;
+  align-items: center;
+} */
+
+.sidebar-and-content {
+  grid-template-columns: 1fr;
+  width: 100%;
+  height: calc(100% - 57px);
+  justify-content: center;
+  display: grid;
+  gap: 4em;
+}
+
+.container {
+  height: 100%;
+}

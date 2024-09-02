@@ -1,0 +1,14 @@
+h1 {
+  text-align: center;
+}
+
+.table-container {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table-container th,
+.table-container td {
+  padding: 8px;
+  border: 1px solid #dddddd;
+}

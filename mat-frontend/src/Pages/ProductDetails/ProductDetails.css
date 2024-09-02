@@ -1,0 +1,33 @@
+.addProductDetails-header-container {
+  display: grid;
+  grid-template-columns: 8fr 1fr;
+  width: 50em;
+  justify-items: center;
+  align-items: center;
+  color: var(--primary-color);
+  margin: 20px auto;
+}
+
+.addProductDetails-header-container > a {
+  text-decoration: none;
+  color: var(--primary-color);
+}
+
+.addProductDetails-form-container > form > .only-inputs {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  width: 50em;
+}
+
+.product-add-button-container,
+.product-update-button-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.pack_size_uom {
+  display: flex;
+  gap: 20px;
+}

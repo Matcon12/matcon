@@ -1,0 +1,62 @@
+.homepage-card {
+  background: #ffffff;
+  width: 200px;
+  height: 150px;
+  border-radius: 40px;
+  box-shadow: 20px 20px 60px #d9d9d9, -20px -20px 60px #ffffff;
+  /* display: flex;
+  justify-content: center;
+  align-items: center; */
+}
+
+.homepage-card .homepage-image {
+  width: 60px;
+  position: relative;
+  top: -24px;
+  left: 20px;
+}
+
+.homepage-card p {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  text-align: center;
+}
+
+.homepage-card {
+  /* position: absolute; */
+  transition: transform 0.3s ease;
+}
+
+.homepage-card:hover {
+  transform: scale(1.05);
+  cursor: pointer;
+}
+
+.homepage-card .homepage-image {
+  transition: opacity 0.3s ease;
+}
+
+.homepage-card:hover .homepage-image {
+  opacity: 0; /* Hide the original image on hover */
+}
+
+.homepage-card::before {
+  content: "";
+  position: absolute;
+  top: -24px;
+  left: 20px;
+  width: 60px;
+  height: 60px;
+  background-image: var(--hover-image);
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none; /* Ensure it doesn't interfere with the hover event */
+}
+
+.homepage-card:hover::before {
+  opacity: 1; /* Show the new image on hover */
+}

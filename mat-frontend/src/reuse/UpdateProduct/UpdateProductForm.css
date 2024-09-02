@@ -1,0 +1,10 @@
+.updateProductFormContainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 25px;
+  width: 50em;
+}
+
+.updateProductFormContainer > .kitProd_desc {
+  grid-column: span 2;
+}

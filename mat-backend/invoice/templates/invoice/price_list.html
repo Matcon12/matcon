@@ -1,0 +1,41 @@
+{% extends 'base_template.html' %}{% block content %}
+
+<h1>Price List</h1>
+<form action="" method="POST">
+  {% csrf_token %}
+  <label for="product_code">Product Code:</label>
+  <input type="text" id="product_code" name="product_code" />
+  <button type="submit">Search</button>
+</form>
+
+{% if price_lists %}
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Product Code</th>
+        <th>Product Description</th>
+        <th>Number 2022 Rates</th>
+        <th>Percentage change from 2022 - 2023</th>
+        <th>Number 2023 Rates</th>
+        <th>Percentage change frmo 2023 - 2024</th>
+        <th>Number 2024 Rates</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for price_list in price_lists %}
+      <tr>
+        <td>{{ price_list.product_code }}</td>
+        <td>{{price_list.product_description}}</td>
+        <td>{{price_list.number_2022_rates}}</td>
+        <td>{{price_list.percentage_change_22_23_field}}</td>
+        <td>{{price_list.number_2023_rates}}</td>
+        <td>{{price_list.percentage_change_23_24_field}}</td>
+        <td>{{price_list.number_2024_rates}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'base_template.html' %} {% block content %}
+<h1>Invoice</h1>
+<form action="" method="POST">
+  {% csrf_token %}
+  <label for="product_code">Product Code:</label>
+  <input type="text" id="product_code" name="product_code" />
+  <button type="submit">Search</button>
+</form>
+
+{% if invoices %}
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Party Name</th>
+        <th>PO Date</th>
+        <th>Invoice No</th>
+        <th>Invoice Date</th>
+        <th>Product Code</th>
+        <th>Product Description</th>
+        <th>Specification</th>
+        <th>Tariff Code</th>
+        <th>Pack Size</th>
+        <th>Quantity</th>
+        <th>UOM</th>
+        <th>Total Quantity</th>
+        <th>Currency</th>
+        <th>Unit Price</th>
+        <th>Total Amount</th>
+        <th>Rate</th>
+        <th>Unit Price In Rs</th>
+        <th>Tot Amt Rs.</th>
+        <th>CD</th>
+        <th>IGST</th>
+        <th>Foreign Freight ( Excl GST )</th>
+        <th>Ex works Freight UK ( Excl GST)</th>
+        <th>CHA Charges (Excl GST)</th>
+        <th>Total Excl ( IGST )</th>
+        <th>Unit Landed Cost (Rs.)</th>
+        <th>Total Landed cost in Rs.</th>
+        <th>B/E Gross weight</th>
+        <th>Field F Freight Ex-Works Freight UK</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td>{{ invoice.party_name }}</td>
+        <td>{{invoice.po_date}}</td>
+        <td>{{ invoice.invoice_no }}</td>
+        <td>{{invoice.invoice_date}}</td>
+        <td>{{ invoice.product_code }}</td>
+        <td>{{invoice.product_description}}</td>
+        <td>{{invoice.specification}}</td>
+        <td>{{invoice.tariff_code}}</td>
+        <td>{{invoice.pack_size}}</td>
+        <td>{{invoice.quantity}}</td>
+        <td>{{invoice.uom}}</td>
+        <td>{{invoice.total_quantity}}</td>
+        <td>{{invoice.currency}}</td>
+        <td>{{invoice.unit_price}}</td>
+        <td>{{invoice.total_amount}}</td>
+        <td>{{invoice.rate}}</td>
+        <td>{{invoice.unit_price_in_rs}}</td>
+        <td>{{invoice.tot_amt_rs_field}}</td>
+        <td>{{invoice.cd}}</td>
+        <td>{{invoice.igst}}</td>
+        <td>{{invoice.foreign_freight_excl_gst_field}}</td>
+        <td>{{invoice.ex_works_freight_uk_excl_gst_field}}</td>
+        <td>{{invoice.cha_charges_excl_gst_field}}</td>
+        <td>{{invoice.total_incl_b_e_igst_excl_cha_igst}}</td>
+        <td>{{invoice.unit_landed_cost_rs_col_24_col_12}}</td>
+        <td>{{invoice.total_landed_cost_in_rs_field}}</td>
+        <td>{{invoice.b_e_gross_weight_kgs}}</td>
+        <td>{{invoice.field_f_freight_ex_works_freight_cha_charges_gw}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %} {% endblock %}

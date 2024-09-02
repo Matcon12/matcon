@@ -1,0 +1,210 @@
+.invoice-container {
+  width: 780px;
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  justify-items: center;
+  border: 1px solid black;
+  gap: 20px;
+  font-size: 10px;
+  font-family: "Times New Roman", Times, serif;
+  padding: 10px 30px;
+}
+
+.invoice-container h5 {
+  grid-column: 1;
+}
+
+.tax_invoice_heading {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: 100%;
+}
+
+/* components style */
+
+.table-address {
+  width: 164px;
+}
+
+h3 {
+  padding: 0 0 5px 0;
+  width: fit-content;
+}
+
+.transportation-mode {
+  width: fit-content;
+  display: inline;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+table > tbody > tr > td {
+  vertical-align: top;
+}
+
+.po-table > thead > tr > th,
+.po-table > tbody > tr > td {
+  border: 1px solid #999;
+  padding: 0.2rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.po-table > tbody > tr > td {
+  word-wrap: break-word;
+}
+
+.po-table > tbody > tr > td.col4,
+.po-table > tbody > tr > td.col5,
+.po-table > tbody > tr > td.col7,
+.po-table > tbody > tr > td.col8,
+.po-table > tbody > tr > td.col10,
+.po-table > tbody > tr > td.col14,
+.po-table > tbody > tr > td.col12 {
+  word-wrap: normal;
+}
+
+.value-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  justify-items: center;
+}
+
+.value-in-words {
+  text-align: center;
+}
+
+.invoice-value {
+  width: 100%;
+}
+
+.invoice-value > tbody > tr > td,
+.toc-table > tbody > tr > td {
+  border: 1px solid #999;
+  padding: 0.5rem;
+  text-align: left;
+  width: 50%;
+  text-align: center;
+  vertical-align: top;
+}
+
+.toc-signature-container {
+  width: 100%;
+  text-align: center;
+}
+
+.toc-table {
+  width: 100%;
+}
+
+.white-space {
+  height: 50px;
+}
+
+.address-word-break {
+  max-width: 150px;
+  word-wrap: break-word;
+}
+
+/* .align-start {
+  text-align: start;
+} */
+
+.toc-container {
+  display: grid;
+  justify-items: center;
+}
+
+.footer {
+  width: 100%;
+  text-align: start;
+}
+
+.page-break {
+  width: 100%;
+}
+
+/* po table width */
+.po-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.col1 {
+  width: 5%;
+}
+
+.col2 {
+  width: 45%;
+  text-align: center; /* Additional style as per inline style */
+}
+
+.col3 {
+  width: 4%;
+}
+
+.col4 {
+  width: 12%;
+}
+
+.col5 {
+  width: 6%;
+}
+
+.col6 {
+  width: 5%;
+}
+
+.col7 {
+  width: 15%;
+}
+
+.col8 {
+  width: 17%;
+}
+
+.col9 {
+  width: 8%;
+}
+
+.col10 {
+  width: 15%;
+}
+
+.col11 {
+  width: 8%;
+}
+
+.col12 {
+  width: 15%;
+}
+
+.col13 {
+  width: 7%;
+}
+
+.col14 {
+  width: 13%;
+}
+
+.col15 {
+  width: 6%;
+}
+
+td.col7,
+td.col8,
+td.col10,
+td.col12,
+td.col14,
+td.col13,
+td.col11,
+td.col9 {
+  text-align: right !important;
+}
