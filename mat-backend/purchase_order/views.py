@@ -689,7 +689,7 @@ def invoice_processing(request):
             'consignee_id': '',
             'po_sl_no': 'oc',
             'prod_code': '',
-            'prod_desc': "Other Charges + " + other_charges["key"] if other_charges["key"] else "Other Charges",
+            'prod_desc': "Other Charges - " + other_charges["key"] if other_charges["key"] else "Other Charges",
             'additional_desc': '',
             # 'omat': '',
             'pack_size': '',
