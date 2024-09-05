@@ -11,6 +11,7 @@ import { format, addYears, parse } from "date-fns"
 import { ToastContainer, toast } from "react-toastify"
 
 import "react-toastify/dist/ReactToastify.css"
+import ConsigeeDetails from "../../../components/Invoice/ConsigneeDetails/ConsigneeDetails.jsx"
 
 export default function Customer() {
   const [customerData, setCustomerData] = useState(0)
@@ -36,6 +37,9 @@ export default function Customer() {
       console.log("product codes: ", response.data.prod_code)
     })
   }, [])
+
+  console.log("customer id: ", customerData)
+  console.log("consignee id: ", consigneeData)
 
   const initialFormData = {
     customerId: "",
@@ -233,29 +237,55 @@ export default function Customer() {
     ])
   }
 
-  useEffect(() => {
-    formData.consigneeId != formData.customerId
-      ? api
-          .get("/customerName", {
-            params: {
-              customerId: formData.consigneeId,
-            },
-          })
-          .then((response) => {
-            console.log("response_data: ", response.data)
-            setFormData((prevFormData) => ({
-              ...prevFormData,
-              consigneeId: formData.consigneeId,
-              consigneeName: response.data.customer_name,
-            }))
-          })
+  // useEffect(() => {
+  //   formData.consigneeId != formData.customerId
+  //     ? api
+  //         .get("/customerName", {
+  //           params: {
+  //             customerId: formData.consigneeId,
+  //           },
+  //         })
+  //         .then((response) => {
+  //           console.log("response_data: ", response.data)
+  //           setFormData((prevFormData) => ({
+  //             ...prevFormData,
+  //             consigneeId: formData.consigneeId,
+  //             consigneeName: response.data.customer_name,
+  //           }))
+  //         })
 
-          .catch((error) => {
-            // resetForm()
-            console.log(error.data.error)
-          })
-      : ""
-    if (formData.consigneeId == "") {
+  //         .catch((error) => {
+  //           // resetForm()
+  //           console.log(error.data.error)
+  //         })
+  //     : ""
+  //   if (formData.consigneeId == "") {
+  //     setFormData((prevFormData) => ({
+  //       ...prevFormData,
+  //       consigneeName: "",
+  //     }))
+  //   }
+  // }, [formData.consigneeId])
+
+  useEffect(() => {
+    if (formData.consigneeId && formData.consigneeId !== formData.customerId) {
+      api
+        .get("/customerName", {
+          params: {
+            customerId: formData.consigneeId,
+          },
+        })
+        .then((response) => {
+          console.log("response_data: ", response.data)
+          setFormData((prevFormData) => ({
+            ...prevFormData,
+            consigneeName: response.data.customer_name,
+          }))
+        })
+        .catch((error) => {
+          console.log(error.data.error)
+        })
+    } else if (formData.consigneeId === "") {
       setFormData((prevFormData) => ({
         ...prevFormData,
         consigneeName: "",
@@ -364,12 +394,12 @@ export default function Customer() {
                     mainData={formData}
                     setData={setConsigneeData}
                     setMainData={setFormData}
-                    handleChange={handleChange}
+                    // handleChange={handleChange}
                     filteredData={filteredConsigneeData}
                     setFilteredData={setFilteredConsigneeData}
                     name="consigneeId"
                     placeholder="Consignee ID"
-                    search_value="consignee_id"
+                    search_value="cust_id"
                   />
                 </div>
                 <div>

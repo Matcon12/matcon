@@ -192,7 +192,7 @@ export default function AutoCompleteComponent({
       {isFocused && filteredData && filteredData.length > 0 && (
         <ul id="autocomplete-list" className="suggestions-list">
           {filteredData.map((suggestion, i) => {
-            console.log(suggestion)
+            // console.log(suggestion)
 
             return (
               <li key={i} onMouseDown={() => handleSuggestionClick(suggestion)}>
