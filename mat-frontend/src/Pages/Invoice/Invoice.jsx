@@ -370,7 +370,7 @@ export default function Invoice() {
             />
             <label
               alt="Enter the number of entries"
-              placeholder="Total Entries"
+              placeholder="Total no. of Invoice Entry"
             ></label>
           </div>
           <button

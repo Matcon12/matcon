@@ -38,8 +38,8 @@ export default function POTable({
           </th>
           <th className="col3">PO Sl. No.</th>
           <th className="col4">HSN Code</th>
-          <th className="col15">UOM</th>
           <th className="col5">QTY</th>
+          <th className="col15">UOM</th>
           {/* <th className="col6">Pk Sz/UOM</th> */}
           <th className="col7">Unit Price</th>
           <th className="col8">Total</th>
@@ -85,7 +85,6 @@ export default function POTable({
               </td>
               <td className="col4">{data.hsn}</td>
               {/* <td className="col15">{data.pack_size}</td> */}
-              <td className="col6">{unit}</td>
               <td className="col5">
                 {data.prod_desc !== "Other Charges" &&
                   data.prod_desc !== "Insurance Charges" &&
@@ -93,6 +92,7 @@ export default function POTable({
                     "Packing forwarding with Freight charges" &&
                   data.qty_delivered}
               </td>
+              <td className="col6">{unit}</td>
               <td className="col7">{data.unit_price.toFixed(2)}</td>
               <td className="col8">
                 {calculateTotal(data.qty_delivered, data.unit_price)}
@@ -124,9 +124,9 @@ export default function POTable({
           <td className="col3" colSpan={2}>
             Total:
           </td>
-          <td className="col15"></td>
           {/* <td className="col5">{total_qty}</td> */}
           <td className="col6">{calculateTotalQuantity}</td>
+          <td className="col15"></td>
           <td className="col7"></td>
           <td className="col8">
             {/* {total_taxable_value} */}

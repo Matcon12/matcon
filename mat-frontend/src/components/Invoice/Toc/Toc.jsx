@@ -1,7 +1,7 @@
 export default function Toc() {
   return (
     <div className="toc-signature-container">
-      <b>Certified that the Particulars given above are correct</b>
+      <b>Certified that the Particulars given above are true and correct</b>
       <table className="toc-table">
         <tbody>
           <tr>
