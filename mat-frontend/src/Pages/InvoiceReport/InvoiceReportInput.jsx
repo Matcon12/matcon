@@ -42,7 +42,7 @@ export default function InvoiceReportInput() {
           if (responseData) {
             // Your logic to handle the data on the frontend
             console.log("Received data:", responseData)
-            const ws = XLSX.utils.json_to_sheet(responseData)
+            const ws = XLSX.utils.json_to_sheet(responseData.data)
 
             const htmlString = XLSX.write(
               { Sheets: { Sheet1: ws }, SheetNames: ["Sheet1"] },
@@ -111,13 +111,38 @@ export default function InvoiceReportInput() {
                 <table class="table table-bordered">
                   <thead>
                     <tr>
-                      ${Object.keys(responseData[0])
+                      ${Object.keys(responseData.data[0])
                         .map((header) => `<th>${header}</th>`)
                         .join("")}
                     </tr>
                   </thead>
                   <tbody>
-                    ${responseData
+                    ${responseData.data
+                      .map(
+                        (row) =>
+                          `<tr>${Object.values(row)
+                            .map((value) => `<td>${value}</td>`)
+                            .join("")}</tr>`
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>
+              <button onclick="closeWindow()">Close</button>
+              <button onclick="downloadExcel()">Download Excel</button>
+
+              <h2>Invoice Report Grouped only on Invoice Number</h2>
+              <div class="table-responsive">
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      ${Object.keys(responseData.data2[0])
+                        .map((header) => `<th>${header}</th>`)
+                        .join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${responseData.data2
                       .map(
                         (row) =>
                           `<tr>${Object.values(row)
@@ -133,7 +158,6 @@ export default function InvoiceReportInput() {
             </body>
           </html>
         `
-
             // Call the function to open the new window and provide download options
             downloadInvoiceReport(htmlString, htmlWithStyles)
           }

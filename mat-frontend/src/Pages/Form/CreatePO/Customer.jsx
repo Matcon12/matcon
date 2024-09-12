@@ -14,6 +14,7 @@ import "react-toastify/dist/ReactToastify.css"
 import ConsigeeDetails from "../../../components/Invoice/ConsigneeDetails/ConsigneeDetails.jsx"
 
 export default function Customer() {
+  const [isKit, setIsKit] = useState([1])
   const [customerData, setCustomerData] = useState(0)
   const [consigneeData, setConsigneeData] = useState()
   const [purchaseOrder, setPurchaseOrder] = useState()
@@ -38,8 +39,8 @@ export default function Customer() {
     })
   }, [])
 
-  console.log("customer id: ", customerData)
-  console.log("consignee id: ", consigneeData)
+  // console.log("customer id: ", customerData)
+  // console.log("consignee id: ", consigneeData)
 
   const initialFormData = {
     customerId: "",
@@ -123,6 +124,7 @@ export default function Customer() {
   const resetForm = () => {
     setFormData(initialFormData)
     setProductDetails([initialProductDetails])
+    setIsKit([1])
   }
 
   const onDateChange = (date, dateString) => {
@@ -186,6 +188,11 @@ export default function Customer() {
     setProductDetails(
       productDetails.filter((productDetail, idx) => idx !== index)
     )
+    setIsKit((prevArray) => {
+      const newArray = [...prevArray]
+      newArray.splice(index, 1)
+      return newArray
+    })
   }
 
   const handleProductClear = (index) => {
@@ -235,6 +242,8 @@ export default function Customer() {
       ...prevProductDetails,
       initialProductDetails,
     ])
+    console.log("isKit: ", isKit)
+    setIsKit((prevData) => [...prevData, 1])
   }
 
   // useEffect(() => {
@@ -439,6 +448,8 @@ export default function Customer() {
                       <ProductDetails
                         key={index}
                         index={index}
+                        isKit={isKit}
+                        setIsKit={setIsKit}
                         formData={productDetails}
                         setFormData={setProductDetails}
                         handleChange={handleProductChange}

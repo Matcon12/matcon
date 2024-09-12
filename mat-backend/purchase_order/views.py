@@ -229,6 +229,7 @@ def get_data_purchase_order(request):
                 filtered_po_sl_nos = [no for no in po_nos if no.startswith(data_dict['po_sl_no'] + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
                 filtered_data_dicts = [model_to_dict(item) for item in filtered_data]
+                print(filtered_data_dicts)
                 total_sum = CustomerPurchaseOrder.objects.filter(pono=po_no).aggregate(total_sum=Sum('total_price'))['total_sum']
                 
 
@@ -258,7 +259,9 @@ def get_data_po_cust(request):
                 po_nos = CustomerPurchaseOrder.objects.filter(pono=po_no).values_list('po_sl_no', flat=True).order_by('po_sl_no')
                 filtered_po_sl_nos = [no for no in po_nos if no.startswith(po_sl_no + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
+                print(filtered_data)
                 filtered_data_dicts = [model_to_dict(item) for item in filtered_data]
+                print(filtered_data_dicts)
                 total_sum = CustomerPurchaseOrder.objects.filter(pono=po_no).aggregate(total_sum=Sum('total_price'))['total_sum']
                 return JsonResponse({"success": True, "data": data, "filtered_data": filtered_data_dicts, "total_sum": total_sum})
             else:
@@ -1143,18 +1146,22 @@ def invoice_report(request):
             start_date = start_datetime.date()
             end_date = end_datetime.date()
 
-            result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date)).select_related('cust_id').values(
-                'gcn_no', 'gcn_date', 'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
-                'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac'
-            ).order_by('gcn_date')
+            # Fetch and filter data from the database
+            result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date))\
+                                  .exclude(taxable_amt=0)\
+                                  .select_related('cust_id')\
+                                  .values('gcn_no', 'gcn_date', 'qty_delivered',
+                                          'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
+                                          'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
+                                  .order_by('gcn_date')
 
-            df = pd.DataFrame(result, columns=['gcn_no', 'gcn_date', 'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price', 'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac'])
-            
-            # Replace null values in 'cust_id__cust_gst_id' with empty strings
-            df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac', 'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
-        
-            # return JsonResponse({"df": df.to_dict()})
-            df.insert(0, 'Sl No', range(1, len(df) + 1))    
+            # Create DataFrame
+            df = pd.DataFrame(result)
+
+            # Reformat DataFrame
+            df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
+                     'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
+            df.insert(0, 'Sl No', range(1, len(df) + 1))
             df = df.rename(columns={
                 'gcn_no': 'Invoice Number',
                 'gcn_date': 'Invoice Date',
@@ -1170,8 +1177,7 @@ def invoice_report(request):
 
             df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
 
-            # return JsonResponse({"df": df.to_dict()})
-
+            # Group data according to specific criteria
             grouped = df.groupby(['Invoice Number', 'Invoice Date', 'HSN/SAC']).agg({
                 'Quantity': 'sum',
                 'Ass.Value': 'sum',
@@ -1180,23 +1186,38 @@ def invoice_report(request):
                 'IGST Price (18%)': 'sum'
             }).reset_index()
 
+            grouped2 = df.groupby(['Invoice Number', 'Invoice Date']).agg({
+                'Quantity': 'sum',
+                'Ass.Value': 'sum',
+                'CGST Price (9%)': 'sum',
+                'SGST Price (9%)': 'sum',
+                'IGST Price (18%)': 'sum'
+            }).reset_index()
+
             df1 = df[['Invoice Number', 'Customer Name', 'Customer GST Num', 'HSN/SAC']].drop_duplicates()
+            df2 = df[['Invoice Number', 'Customer Name', 'Customer GST Num']].drop_duplicates()
 
             df1['Customer GST Num'].fillna('', inplace=True)
-            
+            df2['Customer GST Num'].fillna('', inplace=True)
+
             df1 = df1.sort_values(by="Invoice Number", ascending=True)
+            df2 = df2.sort_values(by="Invoice Number", ascending=True)
 
             combined_df = pd.merge(df1, grouped, on=['Invoice Number', 'HSN/SAC'], how='left')
+            combined_df2 = pd.merge(df2, grouped2, on=['Invoice Number'], how='left')
+
             combined_df['Sl No'] = range(1, len(combined_df) + 1)
+            combined_df2['Sl No'] = range(1, len(combined_df2) + 1)
 
             total_taxable_amt = grouped['Ass.Value'].sum()
             total_cgst_price = grouped['CGST Price (9%)'].sum()
             total_sgst_price = grouped['SGST Price (9%)'].sum()
             total_igst_price = grouped['IGST Price (18%)'].sum()
 
-            combined_df['Invoice Date'] = pd.to_datetime(combined_df['Invoice Date'], errors='coerce').dt.date
-            combined_df['Invoice Date'] = pd.to_datetime(combined_df['Invoice Date'], format='%Y-%m-%d').dt.strftime('%d-%m-%Y')
-            combined_df['Invoice Date'] = combined_df['Invoice Date'].astype(str)
+            total_taxable_amt2 = grouped2['Ass.Value'].sum()
+            total_cgst_price2 = grouped2['CGST Price (9%)'].sum()
+            total_sgst_price2 = grouped2['SGST Price (9%)'].sum()
+            total_igst_price2 = grouped2['IGST Price (18%)'].sum()
 
             total_row = pd.DataFrame({
                 'Sl No': 'Total',
@@ -1213,10 +1234,28 @@ def invoice_report(request):
                 'Round Off': '',
             }, index=[0])
 
+            total_row2 = pd.DataFrame({
+                'Sl No': 'Total',
+                'Customer Name': '',
+                'Customer GST Num': '',
+                'Invoice Date': '',
+                'Invoice Number': '',
+                'HSN/SAC': '',
+                'Quantity': '',
+                'Ass.Value': total_taxable_amt2,
+                'CGST Price (9%)': total_cgst_price2,
+                'SGST Price (9%)': total_sgst_price2,
+                'IGST Price (18%)': total_igst_price2,
+                'Round Off': '',
+            }, index=[0])
+
             combined_df = pd.concat([combined_df, total_row], ignore_index=True)
+            combined_df2 = pd.concat([combined_df2, total_row2], ignore_index=True)
 
             combined_df['Invoice Value'] = combined_df['Ass.Value'] + combined_df['IGST Price (18%)'] + combined_df['CGST Price (9%)'] + combined_df['SGST Price (9%)']
             combined_df['Invoice Value'] = pd.to_numeric(combined_df['Invoice Value']).round()
+            combined_df2['Invoice Value'] = combined_df2['Ass.Value'] + combined_df2['IGST Price (18%)'] + combined_df2['CGST Price (9%)'] + combined_df2['SGST Price (9%)']
+            combined_df2['Invoice Value'] = pd.to_numeric(combined_df2['Invoice Value']).round()
 
             combined_df['Round Off'] = combined_df.apply(
                 lambda row: float(row['Invoice Value']) - (
@@ -1227,24 +1266,35 @@ def invoice_report(request):
                 ) if row['Sl No'] != 'Total' else None,
                 axis=1
             )
+            combined_df2['Round Off'] = combined_df2.apply(
+                lambda row: float(row['Invoice Value']) - (
+                    float(row['Ass.Value']) +
+                    float(row['IGST Price (18%)']) +
+                    float(row['CGST Price (9%)']) +
+                    float(row['SGST Price (9%)'])
+                ) if row['Sl No'] != 'Total' else None,
+                axis=1
+            )
 
             combined_df[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']] = combined_df[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']].apply(lambda x: x.map('{:.2f}'.format))
+            combined_df2[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']] = combined_df2[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']].apply(lambda x: x.map('{:.2f}'.format))
 
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
+            combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
 
             column_order = ['Sl No', 'Customer Name', 'Customer GST Num', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
             combined_df = combined_df[column_order]
-            print("df")
+            combined_df2 = combined_df2[column_order]
 
-            with pd.ExcelWriter('invoiceReports.xlsx', engine='xlsxwriter') as excel_writer:
-                combined_df.to_excel(excel_writer, index=False)
-
+            # Convert to JSON
             json_data = combined_df.to_json(orient='records')
-            print(json_data, "json data")
+            json_data2 = combined_df2.to_json(orient='records')
 
-            return JsonResponse(json.loads(json_data), safe=False)
+            return JsonResponse({"data": json.loads(json_data), "data2": json.loads(json_data2)}, safe=False)
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
+
     
 
 @api_view(['POST'])

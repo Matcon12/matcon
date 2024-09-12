@@ -43,6 +43,8 @@ export default function UpdateProductForm({
     }
   }
 
+  console.log("update data: ", data)
+
   useEffect(() => {
     api
       .get("/packSize", {

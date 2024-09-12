@@ -88,6 +88,7 @@ export default function UpdatePO() {
           })
           .then((response) => {
             let data = response.data.data[0]
+            console.log(response.data.filtered_data)
             setKitData(response.data.filtered_data)
             console.log(response.data.filtered_data)
             const parsedDate = parse(data.podate, "yyyy-MM-dd", new Date())
@@ -178,7 +179,7 @@ export default function UpdatePO() {
           })
           .then((response) => {
             const data = response.data.data
-            console.log("response: ", response)
+            console.log("response: ", response.data.filtered_data)
             setKitData(response.data.filtered_data)
             setPoslnos(response.data.po_sl_nos)
             console.log(response.data.po_sl_nos)

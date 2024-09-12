@@ -16,6 +16,8 @@ import { format, parse } from "date-fns"
 
 export default function ProductDetails({
   index,
+  isKit,
+  setIsKit,
   formData,
   setFormData,
   handleChange,
@@ -147,15 +149,26 @@ export default function ProductDetails({
       uom: "",
       hsn_sac: "",
       quantity: "",
-      unitPrice: 1,
-      totalPrice: "",
+      unitPrice: 0,
+      totalPrice: 0,
       deliveryDate: null,
     }))
 
     // Update the formData state with new entries
     setFormData([...formData, ...newEntries])
+    console.log(...Array(kitQuantity).fill(0))
+    setIsKit((prevData) => {
+      const updatedData = [...prevData]
+      for (let i = 0; i < kitQuantity; i++) {
+        updatedData.push(0)
+      }
+      console.log(updatedData)
+      return updatedData
+    })
     setPopup(false)
   }
+
+  const checkKit = isKit[index]
 
   return (
     <>
@@ -235,40 +248,53 @@ export default function ProductDetails({
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
           </div>
-          <div>
-            <input
-              type="number"
-              name="unitPrice"
-              value={formData[index].unitPrice}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-            />
-            <label alt="Enter the Unit Price" placeholder="Unit Price"></label>
-          </div>
-          <div>
-            <input
-              type="number"
-              name="totalPrice"
-              value={formData[index].totalPrice}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-              readOnly
-            />
-            <label
-              alt="Enter the Total Price"
-              placeholder="Total Price"
-            ></label>
-          </div>
-          <div>
-            <input
-              type="text"
-              name="hsn_sac"
-              value={formData[index].hsn_sac}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-            />
-            <label alt="Enter the HSN/SAC" placeholder="HSN/SAC Code:"></label>
-          </div>
+          {checkKit ? (
+            <div>
+              <input
+                type="number"
+                name="unitPrice"
+                value={formData[index].unitPrice}
+                onChange={(e) => handleChange(index, e)}
+                placeholder=" "
+              />
+              <label
+                alt="Enter the Unit Price"
+                placeholder="Unit Price"
+              ></label>
+            </div>
+          ) : null}
+
+          {checkKit ? (
+            <div>
+              <input
+                type="number"
+                name="totalPrice"
+                value={formData[index].totalPrice}
+                onChange={(e) => handleChange(index, e)}
+                placeholder=" "
+                readOnly
+              />
+              <label
+                alt="Enter the Total Price"
+                placeholder="Total Price"
+              ></label>
+            </div>
+          ) : null}
+          {checkKit ? (
+            <div>
+              <input
+                type="text"
+                name="hsn_sac"
+                value={formData[index].hsn_sac}
+                onChange={(e) => handleChange(index, e)}
+                placeholder=" "
+              />
+              <label
+                alt="Enter the HSN/SAC"
+                placeholder="HSN/SAC Code:"
+              ></label>
+            </div>
+          ) : null}
           <div className="input-container">
             <select
               name="uom"
@@ -284,25 +310,27 @@ export default function ProductDetails({
             </select>
             <label alt="Select an Option" placeholder="UOM"></label>
           </div>
-          <div className="deliveryDate">
-            <div className="datePickerContainer">
-              <Space direction="vertical">
-                <DatePicker
-                  onChange={productDateHandle}
-                  value={
-                    formData[index].deliveryDate
-                      ? dayjs(formData[index].deliveryDate, "DD-MM-YYYY")
-                      : ""
-                  }
-                  format="DD-MM-YYYY"
-                  placeholder={"Delivery Date"}
-                />
-                {formData[index].deliveryDate && (
-                  <label className="deliveryLabel">Delivery Date</label>
-                )}
-              </Space>
+          {checkKit ? (
+            <div className="deliveryDate">
+              <div className="datePickerContainer">
+                <Space direction="vertical">
+                  <DatePicker
+                    onChange={productDateHandle}
+                    value={
+                      formData[index].deliveryDate
+                        ? dayjs(formData[index].deliveryDate, "DD-MM-YYYY")
+                        : ""
+                    }
+                    format="DD-MM-YYYY"
+                    placeholder={"Delivery Date"}
+                  />
+                  {formData[index].deliveryDate && (
+                    <label className="deliveryLabel">Delivery Date</label>
+                  )}
+                </Space>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
         <div className="clearAndDeleteContainer">
           {index == 0 && (
@@ -314,7 +342,7 @@ export default function ProductDetails({
               />
             </div>
           )}
-          {index != 0 && (
+          {index != 0 ? (
             <>
               <div className="delete_current_product">
                 <FontAwesomeIcon
@@ -331,7 +359,7 @@ export default function ProductDetails({
                 />
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
       {popup && (

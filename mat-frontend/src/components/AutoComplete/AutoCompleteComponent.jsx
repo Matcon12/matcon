@@ -80,7 +80,7 @@ export default function AutoCompleteComponent({
         )
       )
       const filtered = data.filter((suggestion) => {
-        console.log(data, suggestion)
+        // console.log(data, suggestion)
         return suggestion[search_value]
           .toLowerCase()
           .includes(value.toLowerCase())
