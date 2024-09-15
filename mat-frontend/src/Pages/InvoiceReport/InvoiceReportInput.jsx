@@ -106,18 +106,19 @@ export default function InvoiceReportInput() {
               </style>
             </head>
             <body>
+              
               <h2>Invoice Report</h2>
               <div class="table-responsive">
                 <table class="table table-bordered">
                   <thead>
                     <tr>
-                      ${Object.keys(responseData.data[0])
+                      ${Object.keys(responseData.data2[0])
                         .map((header) => `<th>${header}</th>`)
                         .join("")}
                     </tr>
                   </thead>
                   <tbody>
-                    ${responseData.data
+                    ${responseData.data2
                       .map(
                         (row) =>
                           `<tr>${Object.values(row)
@@ -131,18 +132,18 @@ export default function InvoiceReportInput() {
               <button onclick="closeWindow()">Close</button>
               <button onclick="downloadExcel()">Download Excel</button>
 
-              <h2>Invoice Report Grouped only on Invoice Number</h2>
+              <h2>Invoice Report (HSN/SAC)</h2>
               <div class="table-responsive">
                 <table class="table table-bordered">
                   <thead>
                     <tr>
-                      ${Object.keys(responseData.data2[0])
+                      ${Object.keys(responseData.data[0])
                         .map((header) => `<th>${header}</th>`)
                         .join("")}
                     </tr>
                   </thead>
                   <tbody>
-                    ${responseData.data2
+                    ${responseData.data
                       .map(
                         (row) =>
                           `<tr>${Object.values(row)

@@ -43,11 +43,11 @@ export default function POTable({
           {/* <th className="col6">Pk Sz/UOM</th> */}
           <th className="col7">Unit Price</th>
           <th className="col8">Total</th>
-          <th className="col9">CGST Rate (%)</th>
+          {/* <th className="col9">CGST Rate (%)</th> */}
           <th className="col10">CGST Amount (Rs)</th>
-          <th className="col11">SGST Rate (%)</th>
+          {/* <th className="col11">SGST Rate (%)</th> */}
           <th className="col12">SGST Amount (Rs)</th>
-          <th className="col13">IGST Rate (%)</th>
+          {/* <th className="col13">IGST Rate (%)</th> */}
           <th className="col14">IGST Amount (Rs)</th>
         </tr>
       </thead>
@@ -62,11 +62,11 @@ export default function POTable({
           <td className="col6 vertical-align-top"></td>
           <td className="col7 vertical-align-top"></td>
           <td className="col8 vertical-align-top"></td>
-          <td className="col9 vertical-align-top"></td>
+          {/* <td className="col9 vertical-align-top"></td> */}
           <td className="col10 vertical-align-top"></td>
-          <td className="col11 vertical-align-top"></td>
+          {/* <td className="col11 vertical-align-top"></td> */}
           <td className="col12 vertical-align-top"></td>
-          <td className="col13 vertical-align-top"></td>
+          {/* <td className="col13 vertical-align-top"></td> */}
           <td className="col14 vertical-align-top"></td>
         </tr>
         {po_data.map((data, index) => {
@@ -97,21 +97,21 @@ export default function POTable({
               <td className="col8">
                 {calculateTotal(data.qty_delivered, data.unit_price)}
               </td>
-              <td className="col9">
+              {/* <td className="col9">
                 {parseInt(total_cgst) === 0 ? "" : gr.cgst_rate}
-              </td>
+              </td> */}
               <td className="col10">
                 {parseInt(total_cgst) === 0 ? "" : data.cgst_price.toFixed(2)}
               </td>
-              <td className="col11">
+              {/* <td className="col11">
                 {parseInt(total_sgst) === 0 ? "" : gr.sgst_rate}
-              </td>
+              </td> */}
               <td className="col12">
                 {parseInt(total_sgst) === 0 ? "" : data.sgst_price.toFixed(2)}
               </td>
-              <td className="col13">
+              {/* <td className="col13">
                 {parseInt(total_igst) === 0 ? "" : gr.igst_rate}
-              </td>
+              </td> */}
               <td className="col14">
                 {parseInt(total_igst) === 0 ? "" : data.igst_price.toFixed(2)}
               </td>
@@ -134,21 +134,21 @@ export default function POTable({
               total_taxable_value - poTableKitChanges.totalTaxableValue
             ).toFixed(2)}
           </td>
-          <td className="col9"></td>
+          {/* <td className="col9"></td> */}
           <td className="col10">
             {parseInt(total_cgst) == 0
               ? ""
               : // : total_cgst}
                 (total_cgst - poTableKitChanges.totalCgst).toFixed(2)}
           </td>
-          <td className="col11"></td>
+          {/* <td className="col11"></td> */}
           <td className="col12">
             {parseInt(total_sgst) == 0
               ? ""
               : // : total_sgst}
                 (total_sgst - poTableKitChanges.totalSgst).toFixed(2)}
           </td>
-          <td className="col13"></td>
+          {/* <td className="col13"></td> */}
           <td className="col14">
             {parseInt(total_igst) == 0
               ? ""

@@ -28,23 +28,29 @@ export default function AutoCompleteComponent({
     setIsFocused(true)
     const { name, value } = event.target
     console.log("entered")
+    // setting hsn_sac when the poslno is selected and to add entries when the product is a kit.
     if (name == "poSlNo") {
       data.map((items, idx) => {
         console.log("entered the map function")
+        // adding entries for the kit components in the invoice generation page.
         if (items.po_sl_no == value && items.prod_code.startsWith("KIT")) {
           let no = items.po_sl_no + "."
           const kit_products = data.filter((d) => d.po_sl_no.startsWith(no))
           setMainData((prevEntries) => {
             const newEntries = [...prevEntries]
             const insertIndex = idx + 1
-            const newKitEntries = kit_products.map((kitItem) => ({
-              noOfBatches: 1,
-              poSlNo: kitItem.po_sl_no,
-              hsnSac: "",
-              quantities: [""],
-              batches: [""],
-              cocs: [""],
-            }))
+            const newKitEntries = kit_products.map((kitItem) => {
+              console.log(kitItem)
+              return {
+                noOfBatches: 1,
+                poSlNo: kitItem.po_sl_no,
+                hsnSac: kitItem.hsnSac,
+                prod_desc: kitItem.prod_desc,
+                quantities: [""],
+                batches: [""],
+                cocs: [""],
+              }
+            })
             newEntries.splice(insertIndex, 0, ...newKitEntries)
             return newEntries
           })
@@ -57,6 +63,7 @@ export default function AutoCompleteComponent({
           [name]: value,
           hsnSac: findHsnCodeByPoSlNo(value),
           prodCode: findProdCodeByPoSlNo(value),
+          prod_desc: findProdDescByPoSlNo(value),
         }
         return newEntries
       })
@@ -117,51 +124,79 @@ export default function AutoCompleteComponent({
     return item ? item.prod_code : null
   }
 
+  const findProdDescByPoSlNo = (poSlNo) => {
+    // console.log(data)
+    const item = data.find((item) => item.po_sl_no == poSlNo)
+    return item ? item.prod_desc : null
+  }
+
   const handleSuggestionClick = (suggestion) => {
     if (array) {
-      console.log(data)
-      data.map((items, idx) => {
+      console.log(data, suggestion[search_value])
+
+      let updatedMainData = []
+
+      data.forEach((items, idx) => {
         if (
-          items.po_sl_no == suggestion[search_value] &&
+          items.po_sl_no === suggestion[search_value] &&
           items.prod_code.startsWith("KIT")
         ) {
           console.log(items.prod_code)
           let no = items.po_sl_no + "."
           const kit_products = data.filter((d) => d.po_sl_no.startsWith(no))
+
+          updatedMainData = kit_products.map((kitItem) => ({
+            noOfBatches: 1,
+            poSlNo: kitItem.po_sl_no,
+            hsnSac: kitItem.hsnSac,
+            prod_desc: kitItem.prod_desc,
+            quantities: [""],
+            batches: [""],
+            cocs: [""],
+          }))
+
+          // Update the main data with KIT products
           setMainData((prevEntries) => {
+            console.log("preventries: ", prevEntries)
+            console.log("updated main data: ", updatedMainData)
+            console.log("insert index:", idx)
             const newEntries = [...prevEntries]
             const insertIndex = idx + 1
-            const newKitEntries = kit_products.map((kitItem) => ({
-              noOfBatches: 1,
-              poSlNo: kitItem.po_sl_no,
-              hsnSac: "",
-              quantities: [""],
-              batches: [""],
-              cocs: [""],
-            }))
-            newEntries.splice(insertIndex, 0, ...newKitEntries)
+            newEntries.splice(index + 1, 0, ...updatedMainData)
+            console.log("after updating: ", newEntries)
             return newEntries
           })
         }
       })
+
+      // Outside update to handle other suggestion clicks
       setMainData((prevEntries) => {
+        console.log("entered outside")
         const newEntries = [...prevEntries]
-        newEntries[index] = {
-          ...newEntries[index],
-          [name]: suggestion[search_value],
-          hsnSac: findHsnCodeByPoSlNo(suggestion[search_value]),
-          prodCode: findProdCodeByPoSlNo(suggestion[search_value]),
+
+        // Ensure `index` is valid
+        if (typeof index !== "undefined") {
+          newEntries[index] = {
+            ...newEntries[index],
+            [name]: suggestion[search_value],
+            hsnSac: findHsnCodeByPoSlNo(suggestion[search_value]),
+            prodCode: findProdCodeByPoSlNo(suggestion[search_value]),
+            prod_desc: findProdDescByPoSlNo(suggestion[search_value]),
+          }
         }
+
         setIsFocused(false)
         return newEntries
       })
     } else {
+      // Handle case where array is not present
       setMainData((prevFormData) => ({
         ...prevFormData,
         [name]: suggestion[search_value],
       }))
       setFilteredData([])
     }
+
     setIsFocused(false)
   }
 

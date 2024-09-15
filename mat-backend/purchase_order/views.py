@@ -1286,6 +1286,8 @@ def invoice_report(request):
             combined_df = combined_df[column_order]
             combined_df2 = combined_df2[column_order]
 
+            combined_df2['HSN/SAC'].fillna('', inplace=True)
+
             # Convert to JSON
             json_data = combined_df.to_json(orient='records')
             json_data2 = combined_df2.to_json(orient='records')

@@ -6,12 +6,15 @@ import "./Dc.css"
 import { defaultBaseSortFn } from "match-sorter"
 
 function groupDataByDescription(data) {
+  console.log("entered groupdataby description")
   const groupedData = []
   data.forEach((item, index) => {
     const existingGroup = groupedData.find(
       (group) => group.prod_desc === item.prod_desc
     )
+    console.log("outside existing group: ", existingGroup)
     if (existingGroup) {
+      console.log("existing group: ", existingGroup)
       existingGroup.items.push(item)
     } else {
       groupedData.push({
@@ -55,11 +58,11 @@ function DcReportC({ formData }) {
   // const groupedData = groupDataByDescription(dcTable)
   console.log("dcTable: ", dcTable)
   console.log("formData: ", formData)
-
-  const groupedData =
-    formData.odc.length != dcTable.length
-      ? nonGroupData(dcTable)
-      : groupDataByDescription(dcTable)
+  console.log(formData.odc.length != dcTable.length)
+  const groupedData = groupDataByDescription(dcTable)
+  // formData.odc.length != dcTable.length
+  //   ? nonGroupData(dcTable)
+  //   : groupDataByDescription(dcTable)
 
   function formatDate(dateStr) {
     const [year, month, day] = dateStr.split("-")

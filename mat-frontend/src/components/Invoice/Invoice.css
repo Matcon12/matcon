@@ -57,9 +57,9 @@ table > tbody > tr > td {
   vertical-align: top;
 }
 
-.po-table > tbody > tr > td {
+/* .po-table > tbody > tr > td {
   word-wrap: break-word;
-}
+} */
 
 .po-table > tbody > tr > td.col4,
 .po-table > tbody > tr > td.col5,

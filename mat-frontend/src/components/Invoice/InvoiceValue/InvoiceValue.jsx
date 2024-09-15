@@ -118,7 +118,8 @@ export default function InvoiceValue({ amount, gt, grandTotal }) {
               <strong>{amt + " Only"}</strong>
             </div>
           </td>
-          <td>Total: {roundNumber(grandTotal).toFixed(2)}</td>
+          <td>Total: {gt}</td>
+          {/* <td>Total: {roundNumber(grandTotal).toFixed(2)}</td> */}
         </tr>
       </tbody>
     </table>

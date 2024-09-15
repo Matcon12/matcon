@@ -180,6 +180,7 @@ export default function Invoice() {
           noOfBatches: 1,
           poSlNo: "",
           hsnSac: "",
+          prod_desc: "",
           quantities: [""],
           batches: [""],
           cocs: [""],
@@ -190,13 +191,12 @@ export default function Invoice() {
     }
   }
 
-  const getData = () => {
+  useEffect(() => {
     api
       .get("/getInvoiceData", {
         params: { poNo: formData.poNo },
       })
       .then((response) => {
-        console.log(response)
         setFormData((prevFormData) => ({
           ...prevFormData,
           customerId: response.data.invoice_header_data.customerId,
@@ -210,10 +210,6 @@ export default function Invoice() {
         // resetForm()
         console.error(error)
       })
-  }
-
-  useEffect(() => {
-    getData()
   }, [formData.poNo])
 
   const handleCheckboxChange = (event) => {
@@ -223,9 +219,6 @@ export default function Invoice() {
     }))
     console.log(formData)
   }
-
-  console.log("entries: ", entries)
-  console.log("purchase Order Details: ", purchaseOrderDetails)
 
   const handleDelete = (index) => {
     setEntries(entries.filter((data, idx) => idx != index))
@@ -284,7 +277,7 @@ export default function Invoice() {
               filteredData={filteredCustomerData}
               setFilteredData={setFilteredCustomerData}
               name="newConsigneeId"
-              placeholder="Consignee Name (if required)"
+              placeholder="New Consignee Id (if required)"
               search_value="cust_id"
             />
           </div>
@@ -370,7 +363,7 @@ export default function Invoice() {
             />
             <label
               alt="Enter the number of entries"
-              placeholder="Total no. of Invoice Entry"
+              placeholder="Total no. of Invoice Entries"
             ></label>
           </div>
           <button
@@ -424,6 +417,27 @@ export default function Invoice() {
                             array={true}
                             index={entryIndex}
                           />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            name="prod_desc"
+                            value={entry.prod_desc}
+                            onChange={(e) =>
+                              handleChange(
+                                entryIndex,
+                                null,
+                                "prod_desc",
+                                e.target.value
+                              )
+                            }
+                            placeholder=" "
+                            readOnly
+                          />
+                          <label
+                            alt="Enter the hsn/sac"
+                            placeholder="Product Description"
+                          ></label>
                         </div>
                         <div>
                           <input
