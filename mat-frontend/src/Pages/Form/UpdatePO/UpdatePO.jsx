@@ -88,6 +88,7 @@ export default function UpdatePO() {
           })
           .then((response) => {
             let data = response.data.data[0]
+            console.log("data: ", data)
             console.log(response.data.filtered_data)
             setKitData(response.data.filtered_data)
             console.log(response.data.filtered_data)

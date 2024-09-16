@@ -73,6 +73,20 @@ export default function UpdateProductForm({
       })
   }, [data.prod_code])
 
+  useEffect(() => {
+    setKitData((prevData) => {
+      return prevData?.map((item) => {
+        if (data.po_sl_no === item.po_sl_no) {
+          return {
+            ...item,
+            qty_balance: data.quantity - data.qty_sent,
+          }
+        }
+        return item
+      })
+    })
+  }, [data.qty_sent, data.quantity])
+
   return (
     <>
       <hr />

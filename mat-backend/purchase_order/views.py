@@ -975,7 +975,7 @@ def invoice_generation(request):
 
         inv_result = list(unique_po_sl_no.values())
         odc1 = otwdc_values.first()
-        # return JsonResponse({"inv_result": inv_result}
+        # return JsonResponse({"inv_result": inv_result})
 
         print("odc1: ", odc1.__dict__)
 
@@ -986,14 +986,17 @@ def invoice_generation(request):
         c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
 
         print('entered')
-        # print("otwdc_values: ", otwdc_values)
+        print("otwdc_values: ", otwdc_values)
         
         total_qty = otwdc_values.aggregate(total_qty=Sum('qty_delivered'))['total_qty'] or 0
         # total_taxable_value = inv_result.aggregate(total_taxable_value=Sum('taxable_amt'))['total_taxable_value'] or 0
         total_taxable_value = sum(item['taxable_amt'] for item in inv_result)
-        total_cgst = otwdc_values.aggregate(total_cgst=Sum('cgst_price'))['total_cgst'] or 0
-        total_sgst = otwdc_values.aggregate(total_sgst=Sum('sgst_price'))['total_sgst'] or 0
-        total_igst = otwdc_values.aggregate(total_igst=Sum('igst_price'))['total_igst'] or 0
+        total_cgst = sum(item['cgst_price'] for item in inv_result)
+        total_sgst = sum(item['sgst_price'] for item in inv_result)
+        total_igst = sum(item['igst_price'] for item in inv_result)
+        # total_cgst = otwdc_values.aggregate(total_cgst=Sum('cgst_price'))['total_cgst'] or 0
+        # total_sgst = otwdc_values.aggregate(total_sgst=Sum('sgst_price'))['total_sgst'] or 0
+        # total_igst = otwdc_values.aggregate(total_igst=Sum('igst_price'))['total_igst'] or 0
 
         grand_total = round(total_taxable_value + total_cgst + total_sgst + total_igst)
         gt = format_currency(grand_total, 'INR', locale='en_IN')
@@ -1013,7 +1016,7 @@ def invoice_generation(request):
             'gt': gt,
             'total_qty': total_qty
         }
-        return JsonResponse({"message": "success", "context": context}, safe=False)
+        return JsonResponse({"message": "success","inv_result": inv_result, "context": context}, safe=False)
     else:
         return JsonResponse({"error": "Only GET requests are allowed"}, status=405)
     

@@ -115,7 +115,7 @@ export default function InvoiceValue({ amount, gt, grandTotal }) {
           <td>
             <div>
               <p>INVOICE VALUE (in Words)</p>
-              <strong>{amt + " Only"}</strong>
+              <strong>{amount}</strong>
             </div>
           </td>
           <td>Total: {gt}</td>
