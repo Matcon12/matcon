@@ -13,3 +13,39 @@
 h3 {
   text-align: center;
 }
+
+@media print {
+  @page {
+    /* margin: 20mm; */
+    counter-increment: page;
+  }
+
+  body,
+  .invoice-report-container,
+  .invoice-container-container {
+    background-color: transparent; /* Change this to whatever "paper" color you want */
+    color: black; /* Optional: Ensure text color is suitable for printing */
+  }
+
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    text-align: right;
+    padding-right: 20px;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  .pageNumber::after {
+    content: counter(page);
+  }
+
+  .totalPages::after {
+    content: counter(pages);
+  }
+
+  /* Reset counters on each new print */
+  body {
+    counter-reset: page;
+  }
+}

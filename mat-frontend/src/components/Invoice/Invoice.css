@@ -25,6 +25,19 @@
   width: 100%;
 }
 
+/* receiver address */
+.receiver-address {
+  width: 100%;
+}
+
+.receiver-name {
+  width: 10px;
+}
+.receiver-dots {
+  width: 1px;
+}
+/* receiver address  */
+
 /* components style */
 
 .table-address {
@@ -147,7 +160,7 @@ table > tbody > tr > td {
 }
 
 .col3 {
-  width: 4%;
+  width: 8%;
 }
 
 .col4 {
@@ -155,7 +168,7 @@ table > tbody > tr > td {
 }
 
 .col5 {
-  width: 6%;
+  width: 8%;
 }
 
 .col6 {
@@ -163,11 +176,11 @@ table > tbody > tr > td {
 }
 
 .col7 {
-  width: 15%;
+  width: 13%;
 }
 
 .col8 {
-  width: 17%;
+  width: 15%;
 }
 
 .col9 {
@@ -175,7 +188,7 @@ table > tbody > tr > td {
 }
 
 .col10 {
-  width: 15%;
+  width: 16%;
 }
 
 .col11 {
@@ -183,7 +196,7 @@ table > tbody > tr > td {
 }
 
 .col12 {
-  width: 15%;
+  width: 16%;
 }
 
 .col13 {
@@ -191,13 +204,16 @@ table > tbody > tr > td {
 }
 
 .col14 {
-  width: 13%;
+  width: 16%;
 }
 
 .col15 {
-  width: 6%;
+  width: 8%;
 }
 
+td.col3,
+td.col4,
+td.col5,
 td.col7,
 td.col8,
 td.col10,

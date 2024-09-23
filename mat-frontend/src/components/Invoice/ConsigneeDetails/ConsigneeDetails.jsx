@@ -11,13 +11,13 @@ export default function ConsigeeDetails({
   return (
     <div>
       <h3>Details of Consignee(Shipped to)</h3>
-      <table>
+      <table className="receiver-address">
         <tbody>
           <tr>
-            <td>
+            <td className="receiver-name">
               <strong>Name</strong>
             </td>
-            <td>&nbsp;:&nbsp;</td>
+            <td className="receiver-dots">&nbsp;:&nbsp;</td>
             <td>{name}</td>
           </tr>
           <tr>

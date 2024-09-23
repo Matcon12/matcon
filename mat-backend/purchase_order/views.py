@@ -1165,6 +1165,8 @@ def invoice_report(request):
             df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
                      'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
             df.insert(0, 'Sl No', range(1, len(df) + 1))
+            # Reformat the 'gcn_date' into a readable string format
+            df['gcn_date'] = pd.to_datetime(df['gcn_date']).dt.strftime('%d-%m-%Y')
             df = df.rename(columns={
                 'gcn_no': 'Invoice Number',
                 'gcn_date': 'Invoice Date',
@@ -1175,10 +1177,11 @@ def invoice_report(request):
                 'sgst_price': 'SGST Price (9%)',
                 'igst_price': 'IGST Price (18%)',
                 'cust_id__cust_name': 'Customer Name',
-                'cust_id__cust_gst_id': 'Customer GST Num',
+                'cust_id__cust_gst_id': 'Customer GST IN',
             })
 
             df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+
 
             # Group data according to specific criteria
             grouped = df.groupby(['Invoice Number', 'Invoice Date', 'HSN/SAC']).agg({
@@ -1197,11 +1200,11 @@ def invoice_report(request):
                 'IGST Price (18%)': 'sum'
             }).reset_index()
 
-            df1 = df[['Invoice Number', 'Customer Name', 'Customer GST Num', 'HSN/SAC']].drop_duplicates()
-            df2 = df[['Invoice Number', 'Customer Name', 'Customer GST Num']].drop_duplicates()
+            df1 = df[['Invoice Number', 'Customer Name', 'Customer GST IN', 'HSN/SAC']].drop_duplicates()
+            df2 = df[['Invoice Number', 'Customer Name', 'Customer GST IN']].drop_duplicates()
 
-            df1['Customer GST Num'].fillna('', inplace=True)
-            df2['Customer GST Num'].fillna('', inplace=True)
+            df1['Customer GST IN'].fillna('', inplace=True)
+            df2['Customer GST IN'].fillna('', inplace=True)
 
             df1 = df1.sort_values(by="Invoice Number", ascending=True)
             df2 = df2.sort_values(by="Invoice Number", ascending=True)
@@ -1285,7 +1288,7 @@ def invoice_report(request):
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
             combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
 
-            column_order = ['Sl No', 'Customer Name', 'Customer GST Num', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
+            column_order = ['Sl No', 'Customer Name', 'Customer GST IN', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
             combined_df = combined_df[column_order]
             combined_df2 = combined_df2[column_order]
 
@@ -1389,3 +1392,9 @@ def update_user_status(request):
         request.user.save()
         return JsonResponse({'status': 'success'})
     return JsonResponse({'status': 'failed'}, status=400)
+
+def print_invoice_page_data(request):
+    # if request.method == 'GET':
+    gst_rates = GstRates.objects.all()
+
+    return JsonResponse({'gst_rates': gst_rates.values()[0]})

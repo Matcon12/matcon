@@ -4,6 +4,10 @@
   align-items: center;
 }
 
+.table-bordered td:nth-child(n + 7) {
+  text-align: right;
+}
+
 .datePickerContainers {
   position: relative;
   display: flex;

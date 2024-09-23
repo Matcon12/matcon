@@ -7,6 +7,7 @@ export default function POTable({
   total_sgst,
   total_igst,
   poTableKitChanges,
+  gst_rates,
 }) {
   console.log("po_data ", po_data, poTableKitChanges)
   const calculateTotal = (qty, price) => {
@@ -42,13 +43,13 @@ export default function POTable({
           <th className="col15">UOM</th>
           {/* <th className="col6">Pk Sz/UOM</th> */}
           <th className="col7">Unit Price</th>
-          <th className="col8">Total</th>
+          <th className="col8">Total Taxable Amount</th>
           {/* <th className="col9">CGST Rate (%)</th> */}
-          <th className="col10">CGST Amount (Rs)</th>
+          <th className="col10">CGST Amount @{gst_rates.cgst_rate}% (Rs)</th>
           {/* <th className="col11">SGST Rate (%)</th> */}
-          <th className="col12">SGST Amount (Rs)</th>
+          <th className="col12">SGST Amount @{gst_rates.sgst_rate}% (Rs)</th>
           {/* <th className="col13">IGST Rate (%)</th> */}
-          <th className="col14">IGST Amount (Rs)</th>
+          <th className="col14">IGST Amount @{gst_rates.igst_rate}% (Rs)</th>
         </tr>
       </thead>
       <tbody>
@@ -86,7 +87,7 @@ export default function POTable({
               <td className="col4">{data.hsn}</td>
               {/* <td className="col15">{data.pack_size}</td> */}
               <td className="col5">
-                {data.prod_desc !== "Other Charges" &&
+                {!data.prod_desc.startsWith("Other Charges") &&
                   data.prod_desc !== "Insurance Charges" &&
                   data.prod_desc !==
                     "Packing forwarding with Freight charges" &&
@@ -125,7 +126,7 @@ export default function POTable({
             Total:
           </td>
           {/* <td className="col5">{total_qty}</td> */}
-          <td className="col6">{calculateTotalQuantity}</td>
+          <td className="col5">{calculateTotalQuantity}</td>
           <td className="col15"></td>
           <td className="col7"></td>
           <td className="col8">

@@ -70,7 +70,7 @@ function DcReportC({ formData }) {
   }
 
   return (
-    <>
+    <div className="dc-container">
       <h2>DELIVERY CHALLAN</h2>
       <br />
       <br />
@@ -179,11 +179,11 @@ function DcReportC({ formData }) {
                         <td rowSpan={group.items.length}>{group.prod_desc}</td>
                       </>
                     )}
-                    <td>{totalQty}</td>
-                    <td>{data.pack_size}</td>
-                    <td>{data.batch_quantity}</td>
+                    <td className="a-right">{totalQty}</td>
+                    <td className="a-right">{data.pack_size}</td>
+                    <td className="a-right">{data.batch_quantity}</td>
                     <td>{unit}</td>
-                    <td>{data.batch}</td>
+                    <td className="a-right">{data.batch}</td>
                     {/* <td>{data.coc}</td> */}
                   </tr>
                 )
@@ -214,7 +214,7 @@ function DcReportC({ formData }) {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -8,7 +8,7 @@ import InvoiceValue from "./InvoiceValue/InvoiceValue"
 import Toc from "./Toc/Toc"
 import { useState, useEffect } from "react"
 
-export default function Invoice({ formData }) {
+export default function Invoice({ formData, rates }) {
   function formatDate(dateStr) {
     const [year, month, day] = dateStr.split("-")
     return `${day}-${month}-${year}`
@@ -121,6 +121,7 @@ export default function Invoice({ formData }) {
               total_igst={formData.total_igst}
               pack_size={formData.pack_size}
               poTableKitChanges={poTableKitChanges}
+              gst_rates={rates}
             />
             <div className="page-break">
               <InvoiceValue

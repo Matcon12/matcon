@@ -201,6 +201,7 @@ export default function UpdateProductForm({
             value={data.qty_balance}
             onChange={handleChange}
             placeholder=" "
+            readOnly
           />
           <label
             alt="Enter the Quantity"

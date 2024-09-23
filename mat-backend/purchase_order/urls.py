@@ -34,5 +34,6 @@ urlpatterns = [
   path("postFinalPo", views.postFinalPo, name="postfinalpo"),
   path("updateFinalPo", views.updateFinalPo, name="updatefinalpo"),
   path("getContactNames", views.get_contact_names, name="contactNames"),
-  path("updateUserStatus", views.update_user_status, name="update_user_status")
+  path("updateUserStatus", views.update_user_status, name="update_user_status"),
+  path("printInvoicePageData", views.print_invoice_page_data, name="print_invoice_page_data")
 ]
