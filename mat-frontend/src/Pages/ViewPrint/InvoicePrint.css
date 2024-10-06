@@ -14,17 +14,16 @@ h3 {
   text-align: center;
 }
 
-@media print {
+/* @media print {
   @page {
-    /* margin: 20mm; */
     counter-increment: page;
   }
 
   body,
   .invoice-report-container,
   .invoice-container-container {
-    background-color: transparent; /* Change this to whatever "paper" color you want */
-    color: black; /* Optional: Ensure text color is suitable for printing */
+    background-color: transparent;
+    color: black;
   }
 
   .print-footer {
@@ -44,8 +43,49 @@ h3 {
     content: counter(pages);
   }
 
-  /* Reset counters on each new print */
   body {
     counter-reset: page;
+  }
+} */
+
+@media print {
+  @page {
+    size: auto;
+  }
+
+  body {
+    counter-reset: page;
+  }
+
+  .invoice-container-container {
+    page-break-after: always;
+  }
+
+  body,
+  .invoice-report-container,
+  .invoice-container-container {
+    background-color: transparent;
+    color: black;
+  }
+
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    font-size: 12px;
+    text-align: right;
+    padding-right: 20px;
+  }
+
+  .pageNumber::after {
+    content: counter(page);
+  }
+
+  .totalPages::after {
+    content: attr(data-total);
+  }
+
+  body {
+    counter-increment: page;
   }
 }

@@ -8,11 +8,15 @@ import { ToastContainer, toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 
 export default function InvoicePrint() {
-  const [rates, setRates] = useState(null) // Initialize as null or empty
+  const [rates, setRates] = useState(null)
   const [formData, setFormData] = useState({
     invoiceNumber: "",
-    year: "", // Initially, keep it empty
+    year: "",
   })
+  const [responseData, setResponseData] = useState()
+  const [totalPages, setTotalPages] = useState(0) // Using state to trigger a re-render
+
+  const componentRef = useRef()
 
   useEffect(() => {
     api.get("/printInvoicePageData").then((response) => {
@@ -25,17 +29,15 @@ export default function InvoicePrint() {
     if (rates && rates.fin_year) {
       setFormData((prevData) => ({
         ...prevData,
-        year: getAcademicYear(rates.fin_year), // Update the formData when rates are available
+        year: getAcademicYear(rates.fin_year),
       }))
     }
-  }, [rates]) // This will run when `rates` is updated
+  }, [rates])
 
   function getAcademicYear(year) {
     const nextYear = year + 1
-    return `${year}-${nextYear.toString().slice(-2)}` // Return the year in '2024-25' format
+    return `${year}-${nextYear.toString().slice(-2)}`
   }
-
-  const [responseData, setResponseData] = useState()
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -45,44 +47,40 @@ export default function InvoicePrint() {
     }))
   }
 
-  const componentRef = useRef()
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
+    onBeforeGetContent: () => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          if (componentRef.current) {
+            // Calculate total pages based on the scroll height and window height
+            const contentHeight = componentRef.current.scrollHeight
+            const pageHeight = window.innerHeight // Approximate page height
+            const pages = Math.ceil(contentHeight / pageHeight)
+
+            setTotalPages(pages) // Set total pages in state to trigger a re-render
+          }
+          resolve()
+        }, 500) // Timeout to allow calculation (to ensure proper rendering)
+      })
+    },
+    onAfterPrint: () => {
+      console.log("Print finished")
+    },
   })
 
-  console.log("formdata: ", formData)
-
   const InvoiceC = React.forwardRef((props, ref) => {
-    const totalPages = useRef(0)
-
-    useEffect(() => {
-      if (componentRef.current) {
-        totalPages.current = Math.ceil(
-          componentRef.current.offsetHeight / window.innerHeight
-        ) // Calculate total pages based on the height
-      }
-    }, [responseData]) // Recalculate when responseData changes
-
     return (
       <div ref={ref} className="invoice-container-container">
         <Invoice ref={ref} formData={responseData} rates={rates} />
         <div className="print-footer">
           Page <span className="pageNumber"></span> of{" "}
-          <span className="totalPages">{totalPages.current}</span>
+          <span className="totalPages">{totalPages}</span>{" "}
+          {/* Display the correct total page count */}
         </div>
       </div>
     )
   })
-
-  // const InvoiceC = React.forwardRef((props, ref) => (
-  //   <div ref={ref} className="invoice-container-container">
-  //     <Invoice ref={ref} formData={responseData} rates={rates} />
-  //     <div className="print-footer">
-  //       Page <span className="pageNumber"></span> of{" "}
-  //       <span className="totalPages"></span>
-  //     </div>
-  //   </div>
-  // ))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -112,7 +110,6 @@ export default function InvoicePrint() {
             <input
               type="text"
               name="invoiceNumber"
-              /*required={true}*/
               value={formData.invoiceNumber}
               onChange={handleChange}
               placeholder=" "
@@ -126,7 +123,6 @@ export default function InvoicePrint() {
             <input
               type="text"
               name="year"
-              /*required={true}*/
               value={formData.year}
               onChange={handleChange}
               placeholder=" "

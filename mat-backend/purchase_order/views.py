@@ -1153,7 +1153,7 @@ def invoice_report(request):
             result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date))\
                                   .exclude(taxable_amt=0)\
                                   .select_related('cust_id')\
-                                  .values('gcn_no', 'gcn_date', 'qty_delivered',
+                                  .values('gcn_no', 'gcn_date', 'batch_quantity',
                                           'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
                                           'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
                                   .order_by('gcn_date')
@@ -1163,7 +1163,7 @@ def invoice_report(request):
 
             # Reformat DataFrame
             df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
-                     'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
+                     'batch_quantity', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
             df.insert(0, 'Sl No', range(1, len(df) + 1))
             # Reformat the 'gcn_date' into a readable string format
             df['gcn_date'] = pd.to_datetime(df['gcn_date']).dt.strftime('%d-%m-%Y')
@@ -1171,7 +1171,7 @@ def invoice_report(request):
                 'gcn_no': 'Invoice Number',
                 'gcn_date': 'Invoice Date',
                 'hsn_sac': 'HSN/SAC',
-                'qty_delivered': 'Quantity',
+                'batch_quantity': 'Quantity',
                 'taxable_amt': 'Ass.Value',
                 'cgst_price': 'CGST Price (9%)',
                 'sgst_price': 'SGST Price (9%)',
@@ -1228,7 +1228,7 @@ def invoice_report(request):
             total_row = pd.DataFrame({
                 'Sl No': 'Total',
                 'Customer Name': '',
-                'Customer GST Num': '',
+                'Customer GST IN': '',
                 'Invoice Date': '',
                 'Invoice Number': '',
                 'HSN/SAC': '',
@@ -1243,7 +1243,7 @@ def invoice_report(request):
             total_row2 = pd.DataFrame({
                 'Sl No': 'Total',
                 'Customer Name': '',
-                'Customer GST Num': '',
+                'Customer GST IN': '',
                 'Invoice Date': '',
                 'Invoice Number': '',
                 'HSN/SAC': '',
@@ -1257,6 +1257,8 @@ def invoice_report(request):
 
             combined_df = pd.concat([combined_df, total_row], ignore_index=True)
             combined_df2 = pd.concat([combined_df2, total_row2], ignore_index=True)
+
+            # return JsonResponse({'result': combined_df.to_dict()})
 
             combined_df['Invoice Value'] = combined_df['Ass.Value'] + combined_df['IGST Price (18%)'] + combined_df['CGST Price (9%)'] + combined_df['SGST Price (9%)']
             combined_df['Invoice Value'] = pd.to_numeric(combined_df['Invoice Value']).round()

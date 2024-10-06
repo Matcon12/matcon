@@ -36,6 +36,7 @@ export default function InvoiceReportInput() {
       })
       .then((response) => {
         if (response.status === 200) {
+          console.log(response.data)
           const responseData = response.data
 
           if (responseData) {
