@@ -4,29 +4,54 @@ import { Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext.jsx"
 
 export default function Login() {
-  const [error, setError] = useState()
+  const { login } = useAuth()
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
-    token: "",
     username: "",
     password: "",
   })
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    setError("")
   }
 
-  const { login } = useAuth()
+  const validatePassword = (password) => {
+    const regex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+    return regex.test(password)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
+
+    // Basic validation checks
+    if (!formData.username) {
+      setError("Username is required.")
+      return
+    }
+
+    if (!formData.password) {
+      setError("Password is required.")
+      return
+    }
+
+    // Optional: Password strength validation (useful if your login policy requires it)
+    if (!validatePassword(formData.password)) {
+      setError(
+        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character."
+      )
+      return
+    }
+
     try {
       const message = await login(formData)
-      if ((message.status = 400)) {
+      if (message.status === 400) {
         setError(message.error) // Display the error message returned by the backend
       }
     } catch (err) {
-      setError("Please check Username and Password")
+      setError("Please check Username and Password.")
     }
   }
 

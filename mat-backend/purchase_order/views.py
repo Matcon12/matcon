@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser
 
+import re
+
 from datetime import datetime
 # from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -1152,6 +1154,8 @@ def invoice_report(request):
             # Fetch and filter data from the database
             result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date))\
                                   .exclude(taxable_amt=0)\
+                                  .exclude(po_sl_no__in=['oc','ins','fr'])\
+                                  .exclude(po_sl_no__regex=r'\.')\
                                   .select_related('cust_id')\
                                   .values('gcn_no', 'gcn_date', 'batch_quantity',
                                           'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
@@ -1305,20 +1309,34 @@ def invoice_report(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
-    
+PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
 
 @api_view(['POST'])
 def signup(request):
+    # Validate password strength
+    password = request.data.get('password', '')
+    if not re.match(PASSWORD_REGEX, password):
+        return Response(
+            {
+                "password": [
+                    "Password must be at least 8 characters long and include "
+                    "uppercase, lowercase, number, and special character."
+                ]
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate and save user
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
         user = User.objects.get(username=request.data['username'])
-        user.set_password(request.data['password'])
-        # user.is_active = 0
+        user.set_password(password)
         user.save()
         token = Token.objects.create(user=user)
         return Response({'token': token.key, 'user': serializer.data})
-    return Response(serializer.errors, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def login(request):
@@ -1329,9 +1347,9 @@ def login(request):
         return Response("Invalid username or password", status=status.HTTP_404_NOT_FOUND)
     
     # Check if the user is already logged in
-    if user.is_active:
-        return JsonResponse({"error": "User is already Logged In", "status": status.HTTP_400_BAD_REQUEST })
-        return Response("User is already logged in", status=status.HTTP_400_BAD_REQUEST)
+    # if user.is_active:
+    #     return JsonResponse({"error": "User is already Logged In", "status": status.HTTP_400_BAD_REQUEST })
+    #     return Response("User is already logged in", status=status.HTTP_400_BAD_REQUEST)
     # Proceed with login
     token, created = Token.objects.get_or_create(user=user)
     serializer = UserSerializer(user)
@@ -1353,22 +1371,26 @@ def test_token(request):
 
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication, TokenAuthentication])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])  # Allow any authenticated user to log out
 def logout(request):
+    print(f"Authenticated user: {request.user}")
+    
+    # if not request.user.is_authenticated:
+    #     return Response("User not authenticated", status=status.HTTP_403_FORBIDDEN)
+    
     # Attempt to delete the token if it exists
-    print("request: ", request, "request_user: ", request.user)
     try:
         token = Token.objects.get(user=request.user)
-        token.delete()
+        token.delete()  # Remove token for the user
     except Token.DoesNotExist:
         pass  # Token does not exist, which might be okay
 
-    # Update the `is_active` field to `False`
+    # Optionally, deactivate the user if you want, otherwise skip
     # request.user.is_active = False
-    request.user.save()
+    # request.user.save()
 
-    return Response("Logged out successfully!")
-
+    # Log out the user (destroy session or remove token)
+    return Response("Logged out successfully!", status=status.HTTP_200_OK)
 
 def getAllFinalPo(request):
     pono=request.GET.get('pono')

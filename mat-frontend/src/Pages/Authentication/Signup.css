@@ -6,6 +6,7 @@
   background: var(--light-color);
   padding: 40px;
   border-radius: 18px;
+  width: 350px;
 }
 
 .signup-container > .form-footer > a {
@@ -100,4 +101,9 @@ input[type="password"] + label[placeholder]:before {
 
 .error-message {
   color: red;
+  max-width: 100%; /* Restrict width to container */
+  word-wrap: break-word; /* Allow breaking lines */
+  text-align: center; /* Center-align the message */
+  margin-bottom: 1em; /* Optional spacing below the message */
+  font-size: 0.9em; /* Adjust font size if desired */
 }
