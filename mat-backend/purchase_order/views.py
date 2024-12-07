@@ -1338,27 +1338,85 @@ def signup(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+# @api_view(['POST'])
+# def login(request):
+#     # user = get_object_or_404(User, username=request.data['username'])
+#     user = User.objects.get(username=request.data['username'])
+#     print("user: ", user)
+#     if not user.check_password(request.data['password']):
+#         return Response("Invalid username or password", status=status.HTTP_404_NOT_FOUND)
+    
+#     # Check if the user is already logged in
+#     # if user.is_active:
+#     #     return JsonResponse({"error": "User is already Logged In", "status": status.HTTP_400_BAD_REQUEST })
+#     #     return Response("User is already logged in", status=status.HTTP_400_BAD_REQUEST)
+#     # Proceed with login
+#     token, created = Token.objects.get_or_create(user=user)
+#     serializer = UserSerializer(user)
+    
+#     # Update the `logged_in` field to `True`
+#     # user.is_active = 1
+#     user.save()
+
+#     return Response({'token': token.key, 'user': serializer.data})
+
 @api_view(['POST'])
 def login(request):
-    # user = get_object_or_404(User, username=request.data['username'])
-    user = User.objects.get(username=request.data['username'])
-    print("user: ", user)
+    try:
+        user = User.objects.get(username=request.data['username'])
+        print("user: ", user)
+    except User.DoesNotExist:
+        return Response("Invalid username or password", status=status.HTTP_404_NOT_FOUND)
+
     if not user.check_password(request.data['password']):
         return Response("Invalid username or password", status=status.HTTP_404_NOT_FOUND)
-    
-    # Check if the user is already logged in
-    # if user.is_active:
-    #     return JsonResponse({"error": "User is already Logged In", "status": status.HTTP_400_BAD_REQUEST })
-    #     return Response("User is already logged in", status=status.HTTP_400_BAD_REQUEST)
+
     # Proceed with login
     token, created = Token.objects.get_or_create(user=user)
     serializer = UserSerializer(user)
-    
-    # Update the `logged_in` field to `True`
-    # user.is_active = 1
-    user.save()
 
-    return Response({'token': token.key, 'user': serializer.data})
+    # Fetch user permissions
+    user_permissions = user.user_permissions.values_list('codename', flat=True)
+
+    # Add permissions to the response
+    response_data = {
+        'token': token.key,
+        'user': serializer.data,
+        'permissions': list(user_permissions),  # Convert to list for JSON serialization
+    }
+
+    return Response(response_data)
+
+@api_view(['DELETE'])
+def delete_user(request):
+    username = request.data.get('username', None)
+    
+    if not username:
+        return Response(
+            {"error": "Username is required to delete a user."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Retrieve the user by username
+        user = User.objects.get(username=username)
+        
+        # Delete the associated token
+        Token.objects.filter(user=user).delete()
+        
+        # Delete the user
+        user.delete()
+        
+        return Response(
+            {"message": f"User '{username}' has been successfully deleted."},
+            status=status.HTTP_200_OK
+        )
+    except User.DoesNotExist:
+        return Response(
+            {"error": f"User '{username}' does not exist."},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication, TokenAuthentication])

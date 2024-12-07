@@ -52,12 +52,17 @@ export const AuthProvider = ({ children }) => {
   const signup = async (credentials) => {
     try {
       const response = await api.post("/signup", credentials)
+      console.log("signup response: ", response)
       if (response.statusText) {
-        const userData = { token: response.data.token, ...response.data.user }
-        localStorage.setItem("jwt", response.data.token)
-        localStorage.setItem("user", JSON.stringify(userData))
-        setUser(userData)
-        navigate("/", { replace: true })
+        const userData = {
+          token: response.data.token,
+          ...response.data.user,
+          permissions: [],
+        }
+        // localStorage.setItem("jwt", response.data.token)
+        // localStorage.setItem("user", JSON.stringify(userData))
+        // setUser(userData)
+        // navigate("/sign", { replace: true })
       }
     } catch (error) {
       console.error("Signup error:", error)
@@ -71,7 +76,11 @@ export const AuthProvider = ({ children }) => {
       const data = response.data
       console.log("error data: ", data)
       if (data.token) {
-        const userData = { token: data.token, ...data.user }
+        const userData = {
+          token: data.token,
+          ...data.user,
+          permissions: data.permissions,
+        }
         localStorage.setItem("jwt", data.token)
         localStorage.setItem("user", JSON.stringify(userData))
         setUser(userData)

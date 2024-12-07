@@ -29,6 +29,8 @@ import InvoiceReportInput from "./Pages/InvoiceReport/InvoiceReportInput.jsx"
 import { useAuth } from "./context/AuthContext.jsx"
 import InvoicePrint from "./Pages/ViewPrint/InvoicePrint.jsx"
 
+import PermissionRoute from "./Route/PermissionRoute.jsx"
+
 export default function App() {
   const location = useLocation()
   const { hash, pathname, search } = location
@@ -96,7 +98,14 @@ export default function App() {
                 <Route index element={<InvoiceReportInput />} />
               </Route>
             </Route>
-            <Route path="signup" element={<Signup />} />
+            <Route
+              path="signup"
+              element={
+                <PermissionRoute requiredRole="view_signup">
+                  <Signup />
+                </PermissionRoute>
+              }
+            />
             <Route path="login" element={<Login />} />
             <Route path="*" element={<ErrorPage />} />
           </Routes>

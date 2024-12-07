@@ -1,12 +1,11 @@
-// components/AdminRoute.jsx
 import React from "react"
 import { Navigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 const AdminRoute = ({ element }) => {
-  const { user } = useAuth()
+  const { user, permissions } = useAuth()
 
-  if (!user || !user.isAdmin) {
+  if (!user || permissions.includes("view_signup")) {
     // Redirect to home or another appropriate page if not admin
     return <Navigate to="/login" />
   }

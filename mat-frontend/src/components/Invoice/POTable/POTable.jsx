@@ -7,7 +7,6 @@ export default function POTable({
   total_sgst,
   total_igst,
   poTableKitChanges,
-  gst_rates,
 }) {
   console.log("po_data ", po_data, poTableKitChanges)
   const calculateTotal = (qty, price) => {
@@ -45,11 +44,11 @@ export default function POTable({
           <th className="col7">Unit Price</th>
           <th className="col8">Total Taxable Amount</th>
           {/* <th className="col9">CGST Rate (%)</th> */}
-          <th className="col10">CGST Amount @{gst_rates.cgst_rate}% (Rs)</th>
+          <th className="col10">CGST Amount @{gr.cgst_rate}% (Rs)</th>
           {/* <th className="col11">SGST Rate (%)</th> */}
-          <th className="col12">SGST Amount @{gst_rates.sgst_rate}% (Rs)</th>
+          <th className="col12">SGST Amount @{gr.sgst_rate}% (Rs)</th>
           {/* <th className="col13">IGST Rate (%)</th> */}
-          <th className="col14">IGST Amount @{gst_rates.igst_rate}% (Rs)</th>
+          <th className="col14">IGST Amount @{gr.igst_rate}% (Rs)</th>
         </tr>
       </thead>
       <tbody>
