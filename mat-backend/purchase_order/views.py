@@ -712,7 +712,7 @@ def invoice_processing(request):
 
         po_sl_numbers.append('oc')
         qty_tobe_del.append(1)
-        hsn.append('')
+        hsn.append('9971')
         subitems = {
             "batch": [""],
             "coc": [""],

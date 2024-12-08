@@ -31,7 +31,7 @@ export default function Navbar() {
                 <Link to="/login">Login</Link>
               )}
             </li>
-            {user?.permissions.includes("view_signup") ? (
+            {user?.permissions?.includes("view_signup") ? (
               <li>
                 <Link to="/signup">Add New User</Link>
               </li>
