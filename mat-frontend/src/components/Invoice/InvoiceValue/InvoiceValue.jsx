@@ -118,7 +118,7 @@ export default function InvoiceValue({ amount, gt, grandTotal }) {
               <strong>{amount}</strong>
             </div>
           </td>
-          <td>Total: {gt}</td>
+          <td>Total: <b>{gt}</b></td>
           {/* <td>Total: {roundNumber(grandTotal).toFixed(2)}</td> */}
         </tr>
       </tbody>

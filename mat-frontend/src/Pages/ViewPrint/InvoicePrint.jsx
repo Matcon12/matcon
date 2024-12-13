@@ -74,8 +74,9 @@ export default function InvoicePrint() {
       <div ref={ref} className="invoice-container-container">
         <Invoice ref={ref} formData={responseData} rates={rates} />
         <div className="print-footer">
-          Page <span className="pageNumber"></span> of{" "}
-          <span className="totalPages">{totalPages}</span>{" "}
+          Page <span className="pageNumber"></span>
+          {/*Page <span className="pageNumber"></span> of{" "}
+          <span className="totalPages">{totalPages}</span>{" "}*/}
           {/* Display the correct total page count */}
         </div>
       </div>

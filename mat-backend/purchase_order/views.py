@@ -753,7 +753,11 @@ def invoice_processing(request):
     df_inw["cust_id"] = cust_id
     df_inw["gcn_no"] = gcn_num
     df_inw["gcn_date"] = date
-    df_inw["consignee_id"] = cust_id if new_cons_id == '' else new_cons_id
+    #--------------------------------- TJ ----------------------------------
+    # df_inw["consignee_id"] = cust_id if new_cons_id == '' else new_cons_id
+    if new_cons_id != '':
+        df_inw["consignee_id"] = new_cons_id
+    #-----------------------------------------------------------------------
     # return JsonResponse({"df_inw": df_inw.to_dict()})
 
     qty_dict = dict(zip(po_sl_numbers, qty_tobe_del))
@@ -1152,30 +1156,59 @@ def invoice_report(request):
             end_date = end_datetime.date()
 
             # Fetch and filter data from the database
+
+            #---------------------------------------- TJ ---------------------------------------
+            # Changed batch_quantity to qty_delivered, and added po_sl_no to identify duplicates
+            
+            # result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date))\
+            #                       .exclude(taxable_amt=0)\
+            #                       .exclude(po_sl_no__in=['oc','ins','fr'])\
+            #                       .exclude(po_sl_no__regex=r'\.')\
+            #                       .select_related('cust_id')\
+            #                       .values('gcn_no', 'gcn_date', 'batch_quantity',
+            #                               'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
+            #                               'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
+            #                       .order_by('gcn_date')
+
+            # # Create DataFrame
+            # df = pd.DataFrame(result)
+
+            # # Reformat DataFrame
+            # df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
+            #          'batch_quantity', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
+            # df.insert(0, 'Sl No', range(1, len(df) + 1))
+            # 
             result = OtwDc.objects.filter(gcn_date__range=(start_date, end_date))\
-                                  .exclude(taxable_amt=0)\
-                                  .exclude(po_sl_no__in=['oc','ins','fr'])\
-                                  .exclude(po_sl_no__regex=r'\.')\
-                                  .select_related('cust_id')\
-                                  .values('gcn_no', 'gcn_date', 'batch_quantity',
-                                          'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
-                                          'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
-                                  .order_by('gcn_date')
+                                   .exclude(taxable_amt=0)\
+                                   .exclude(po_sl_no__regex=r'\.')\
+                                   .select_related('cust_id')\
+                                   .values('gcn_no', 'gcn_date', 'po_sl_no', 'qty_delivered',
+                                           'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
+                                           'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
+                                   .order_by('gcn_date')
 
             # Create DataFrame
             df = pd.DataFrame(result)
 
+            # Deleting duplicate po_sl_no rows for same gcn_no to keep only one batch_no record
+            df.drop_duplicates(subset=['gcn_no', 'gcn_date', 'po_sl_no', 'qty_delivered', 'taxable_amt'], keep='first', inplace=True)
+
+            # Setting qty_delivered = 0 for po_sl_no ('oc','fr','ins') and then dropping column po_sl_no
+            df.loc[df['po_sl_no'].isin(['oc','fr','ins']), 'qty_delivered'] = 0
+            df.drop(columns = ['po_sl_no'],inplace=True)
+
             # Reformat DataFrame
             df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
-                     'batch_quantity', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
+                     'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
             df.insert(0, 'Sl No', range(1, len(df) + 1))
+
             # Reformat the 'gcn_date' into a readable string format
             df['gcn_date'] = pd.to_datetime(df['gcn_date']).dt.strftime('%d-%m-%Y')
             df = df.rename(columns={
                 'gcn_no': 'Invoice Number',
                 'gcn_date': 'Invoice Date',
                 'hsn_sac': 'HSN/SAC',
-                'batch_quantity': 'Quantity',
+                'qty_delivered': 'Quantity',
                 'taxable_amt': 'Ass.Value',
                 'cgst_price': 'CGST Price (9%)',
                 'sgst_price': 'SGST Price (9%)',
@@ -1183,9 +1216,9 @@ def invoice_report(request):
                 'cust_id__cust_name': 'Customer Name',
                 'cust_id__cust_gst_id': 'Customer GST IN',
             })
+            #------------------------------------------------------------------------------------------
 
             df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
-
 
             # Group data according to specific criteria
             grouped = df.groupby(['Invoice Number', 'Invoice Date', 'HSN/SAC']).agg({

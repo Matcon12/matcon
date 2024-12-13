@@ -32,23 +32,23 @@ export default function POTable({
     <table className="po-table">
       <thead>
         <tr>
-          <th className="col1">Sl. No.</th>
+          <th className="col1">Sl. #</th>
           <th className="col2" style={{ textAlign: "center" }}>
             Description of Goods
           </th>
-          <th className="col3">PO Sl. No.</th>
-          <th className="col4">HSN Code</th>
-          <th className="col5">QTY</th>
-          <th className="col15">UOM</th>
+          <th className="col3">PO Sl.#</th>
+          <th className="col4" style={{ textAlign: "center" }}>HSN Code</th>
+          <th className="col5" style={{ textAlign: "center" }}>QTY</th>
+          <th className="col15" style={{ textAlign: "center" }}>UoM</th>
           {/* <th className="col6">Pk Sz/UOM</th> */}
-          <th className="col7">Unit Price</th>
-          <th className="col8">Total Taxable Amount</th>
+          <th className="col7" style={{ textAlign: "center" }}>Unit Price</th>
+          <th className="col8" style={{ textAlign: "center" }}>Taxable Amount</th>
           {/* <th className="col9">CGST Rate (%)</th> */}
-          <th className="col10">CGST Amount @{gr.cgst_rate}% (Rs)</th>
+          <th className="col10" style={{ textAlign: "center" }}>CGST @{gr.cgst_rate}%</th>
           {/* <th className="col11">SGST Rate (%)</th> */}
-          <th className="col12">SGST Amount @{gr.sgst_rate}% (Rs)</th>
+          <th className="col12" style={{ textAlign: "center" }}>SGST @{gr.sgst_rate}%</th>
           {/* <th className="col13">IGST Rate (%)</th> */}
-          <th className="col14">IGST Amount @{gr.igst_rate}% (Rs)</th>
+          <th className="col14" style={{ textAlign: "center" }}>IGST @{gr.igst_rate}%</th>
         </tr>
       </thead>
       <tbody>
@@ -79,7 +79,7 @@ export default function POTable({
                 {data.additional_desc ? " " + data.additional_desc : ""}
               </td>
               <td className="col3">
-                {["fr", "in", "oc"].includes(data.po_sl_no)
+                {["fr", "ins", "oc"].includes(data.po_sl_no)
                   ? ""
                   : data.po_sl_no}
               </td>
