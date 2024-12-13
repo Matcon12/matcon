@@ -183,7 +183,7 @@ export default function KitProducts({
               <option value="" disabled>
                 Select an option
               </option>
-              <option value="L">Ltr</option>
+              <option value="Ltr">Ltr</option>
               <option value="Kg">Kg</option>
               <option value="No.">No.</option>
             </select>

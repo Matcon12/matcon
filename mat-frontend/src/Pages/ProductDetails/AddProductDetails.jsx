@@ -158,7 +158,7 @@ export default function AddProductDetails() {
                   <option value="Ltr">Ltr</option>
                   <option value="Kg">Kg</option>
                   <option value="No.">No.</option>
-                  <option value="Kit">Kit</option>
+                  {/*<option value="Kit">Kit</option>*/}
                 </select>
                 <label alt="Select an Option" placeholder="UOM"></label>
               </div>
