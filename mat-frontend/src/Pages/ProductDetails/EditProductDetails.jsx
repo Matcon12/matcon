@@ -210,7 +210,7 @@ export default function EditProductDetails() {
             <div className="pack_size_uom">
               <div>
                 <input
-                  type="text"
+                  type="number"
                   // required={true}
                   name="pack_size"
                   value={packSizeData.pack_size}

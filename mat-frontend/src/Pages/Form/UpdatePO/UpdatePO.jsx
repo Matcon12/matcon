@@ -516,6 +516,7 @@ export default function UpdatePO() {
                     name="prod_code"
                     placeholder="Product Code"
                     search_value="prod_id"
+                    readOnly
                   />
                 </div>
                 <div className="specifications-span-2">
@@ -552,7 +553,7 @@ export default function UpdatePO() {
                     value={searchData.pack_size}
                     onChange={handleChangeData}
                     placeholder=" "
-                    // readOnly
+                    readOnly
                   />
                   <label
                     alt="Enter the Pack Size"
@@ -563,15 +564,16 @@ export default function UpdatePO() {
                   <select
                     name="uom"
                     value={searchData.uom}
-                    onChange={handleChangeData}
+//                    onChange={handleChangeData}
+                    readOnly
                     // required
                   >
-                    <option value="" disabled>
-                      Select an option
-                    </option>
-                    <option value="Ltr">Ltr</option>
-                    <option value="Kg">Kg</option>
-                    <option value="No.">No.</option>
+//                    <option value="" disabled>
+//                      Select an option
+//                    </option>
+//                    <option value="Ltr">Ltr</option>
+//                    <option value="Kg">Kg</option>
+//                    <option value="No.">No.</option>
                   </select>
                   <label alt="Select an Option" placeholder="UOM"></label>
                 </div>
@@ -583,6 +585,7 @@ export default function UpdatePO() {
                     value={searchData.quantity}
                     onChange={handleChangeData}
                     placeholder=" "
+//                    readOnly
                   />
                   <label
                     alt="Enter the Quantity"
@@ -611,6 +614,7 @@ export default function UpdatePO() {
                     value={searchData.unit_price}
                     onChange={handleChangeData}
                     placeholder=" "
+//                    readOnly
                   />
                   <label
                     alt="Enter the Unit Price"

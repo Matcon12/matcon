@@ -13,6 +13,7 @@ import api from "../../api/api.jsx"
 import useDebounce from "../../hooks/useDebounce.jsx"
 import KitProducts from "./KitProducts.jsx"
 import { format, parse } from "date-fns"
+import { ToastContainer, toast } from "react-toastify"
 
 export default function ProductDetails({
   index,
@@ -111,6 +112,11 @@ export default function ProductDetails({
 
   const handlePopupChange = (e) => {
     const { name, value } = e.target
+
+    if (value < 2) {
+      toast.error("KIT must have at least 2 components")
+      return
+    }
     setKitQuantity(value)
   }
 

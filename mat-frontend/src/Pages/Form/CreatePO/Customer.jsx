@@ -78,14 +78,67 @@ export default function Customer() {
     }))
   }
 
+  // -------------------------------Changes by TJ --------------------------
+  // Using regular expression to split quantity and UOM from Pack Size
+
+  function parsePackSize(pk_Sz) {    
+    //const regex = /^(\d+|\d*\.\d+)\s*(\w+)$/
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i;
+  
+    const match = pk_Sz.match(regex)
+  
+    console.log("Match:",match)
+    if (match) {
+      console.log("PkSz:",match[1],"UoM:",match[2])
+      return {
+        qty: parseFloat(match[1]),
+        u_o_m: match[2],
+      }
+    } else {
+      toast.error("Invalid Pack Size Format")
+      throw new Error("Invalid pack size format")
+      return
+    }
+  }
+
   const handleProductChange = (key, event) => {
     const { name, value } = event.target
-    if (name == "quantity" && value < 0) {
-      return
+
+    if (name === "unitPrice") {
+      const pksz = productDetails[key]?.packSize;
+      if (!pksz) {
+        toast.error("Please enter a valid Pack Size first");
+        return;
+      }
+
+      const qnty = productDetails[key]?.quantity;
+      console.log("Original Pack Size:", pksz, "Quantity:", qnty);
+
+      const qtyUom = parsePackSize(pksz);
+      console.log("Pack:", qtyUom.qty, "UoM:", qtyUom.u_o_m);
+
+      // Ensure that value is a valid, positive integer
+      const parsedQuantity = parseFloat(qnty, 10);
+      if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+        toast.error("Quantity must be a positive number");
+        return;
+      }
+
+      // Validate quantity against pack size
+      if (parsedQuantity < qtyUom.qty || parsedQuantity % qtyUom.qty !== 0) {
+        toast.error(
+          `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
+        );
+        return;
+      }
     }
-    if (name == "unitPrice" && value < 0) {
-      return
+
+    if (name === "unitPrice" && value < 0) {
+     toast.error("Unit Price cannot be negative");
+     return;
     }
+  // ------------------------------- End of Changes ------------------------
+
     console.log(key, name)
     setProductDetails(
       productDetails.map((productDetail) => {

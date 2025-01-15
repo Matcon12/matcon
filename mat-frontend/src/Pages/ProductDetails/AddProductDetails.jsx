@@ -133,7 +133,7 @@ export default function AddProductDetails() {
             <div className="pack_size_uom">
               <div>
                 <input
-                  type="text"
+                  type="number"
                   // required={true}
                   name="pack_size"
                   value={packSize.pack_size}
