@@ -61,7 +61,7 @@ export default function AddCustomerDetails() {
     const { name, value } = event.target
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: value,
+      [name]: name === "Cust_ID" ? value.trim() :  value,
     }))
 
     if (name === "Cust_St_Name") {
@@ -91,7 +91,7 @@ export default function AddCustomerDetails() {
         })
         .catch((error) => {
           console.log(error.response.data.error)
-          toast.error("Error")
+          toast.error("Please enter all mandatory columns:")
         })
     } else {
       console.log(formErrors.Cust_PIN)
@@ -164,7 +164,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_ID"
                 value={formData.Cust_ID}
                 onChange={handleChange}
@@ -178,7 +178,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_Name"
                 value={formData.Cust_Name}
                 onChange={handleChange}
@@ -192,7 +192,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_addr1"
                 value={formData.Cust_addr1}
                 onChange={handleChange}
@@ -223,6 +223,7 @@ export default function AddCustomerDetails() {
                 name="Cust_St_Name"
                 placeholder="State Name"
                 search_value="state_name"
+                required={true}
               />
             </div>
             <div>
@@ -243,7 +244,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_City"
                 value={formData.Cust_City}
                 onChange={handleChange}
@@ -254,7 +255,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_PIN"
                 value={formData.Cust_PIN}
                 onChange={handleChange}
@@ -268,7 +269,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Cust_GST_ID"
                 value={formData.Cust_GST_ID}
                 onChange={handleChange}

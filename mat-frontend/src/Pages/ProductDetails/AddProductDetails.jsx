@@ -28,7 +28,7 @@ export default function AddProductDetails() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+    setFormData({ ...formData, [name]: name === "Prod_ID" ? value.trim() : value })
   }
 
   const handlePackSizeChange = (e) => {
@@ -80,7 +80,7 @@ export default function AddProductDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Prod_ID"
                 value={formData.Prod_ID}
                 onChange={handleChange}
@@ -94,7 +94,7 @@ export default function AddProductDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Supp_ID"
                 value={formData.Supp_ID}
                 onChange={handleChange}
@@ -108,7 +108,7 @@ export default function AddProductDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="Prod_Desc"
                 value={formData.Prod_Desc}
                 onChange={handleChange}
@@ -134,7 +134,7 @@ export default function AddProductDetails() {
               <div>
                 <input
                   type="number"
-                  // required={true}
+                  required={true}
                   name="pack_size"
                   value={packSize.pack_size}
                   onChange={handlePackSizeChange}
@@ -150,7 +150,7 @@ export default function AddProductDetails() {
                   name="uom"
                   value={packSize.uom}
                   onChange={handlePackSizeChange}
-                  // required
+                  required={true}
                 >
                   <option value="" disabled>
                     Select an option

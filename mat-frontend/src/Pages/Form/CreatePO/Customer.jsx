@@ -70,15 +70,15 @@ export default function Customer() {
   const [formData, setFormData] = useState(initialFormData)
   const [productDetails, setProductDetails] = useState([initialProductDetails])
 
-  const handleChange = async (event) => {
+  // -------------------------------Changes by TJ --------------------------
+  const handleChange = (event) => {
     const { name, value } = event.target
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: value,
-    }))
-  }
+      [name]: name === "poNo" ? value.trim() : value, //Trimming all spaces
+    }));
+  };
 
-  // -------------------------------Changes by TJ --------------------------
   // Using regular expression to split quantity and UOM from Pack Size
 
   function parsePackSize(pk_Sz) {    
@@ -103,57 +103,61 @@ export default function Customer() {
 
   const handleProductChange = (key, event) => {
     const { name, value } = event.target
+    let qtyUom = null; // Initialize qtyUom outside the block
 
     if (name === "unitPrice") {
+      if (value < 0) {
+        toast.error("Unit Price cannot be negative");
+        return;
+      }
+
       const pksz = productDetails[key]?.packSize;
       if (!pksz) {
-        toast.error("Please enter a valid Pack Size first");
+        toast.error("Please enter a valid Pack Size");
         return;
       }
 
       const qnty = productDetails[key]?.quantity;
       console.log("Original Pack Size:", pksz, "Quantity:", qnty);
 
-      const qtyUom = parsePackSize(pksz);
-      console.log("Pack:", qtyUom.qty, "UoM:", qtyUom.u_o_m);
+      try {
+        qtyUom = parsePackSize(pksz);
+        console.log("Pack:", qtyUom.qty, "UoM:", qtyUom.u_o_m);
 
-      // Ensure that value is a valid, positive integer
-      const parsedQuantity = parseFloat(qnty, 10);
-      if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
-        toast.error("Quantity must be a positive number");
-        return;
-      }
-
-      // Validate quantity against pack size
-      if (parsedQuantity < qtyUom.qty || parsedQuantity % qtyUom.qty !== 0) {
-        toast.error(
-          `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
-        );
-        return;
+        // Ensure that value is a valid, positive integer
+        const parsedQuantity = parseFloat(qnty, 10);
+        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+          toast.error("Quantity must be a positive number");
+          return;
+        }
+        // Validate quantity against pack size
+        if (parsedQuantity < qtyUom.qty || parsedQuantity % qtyUom.qty !== 0) {
+          toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
+          return;
+        }
+      } catch (error) {
+        console.error("Error parsing pack size:", error.message);
+        return; // Exit if pack size parsing fails
       }
     }
-
-    if (name === "unitPrice" && value < 0) {
-     toast.error("Unit Price cannot be negative");
-     return;
-    }
-  // ------------------------------- End of Changes ------------------------
 
     console.log(key, name)
     setProductDetails(
-      productDetails.map((productDetail) => {
-        if (productDetails.indexOf(productDetail) == key) {
+      productDetails.map((productDetail, index) => {
+        if (index === key) {
           return {
             ...productDetail,
+            uom: qtyUom?.u_o_m || productDetail.uom, // Use existing uom if qtyUom is null
             [name]: ["totalPrice", "quantity", "unitPrice"].includes(name)
               ? parseFloat(value)
               : value,
-          }
+          };
         }
-        return productDetail
+        return productDetail;
       })
-    )
-  }
+    );
+  };
+  // ------------------------------- End of Changes ------------------------
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -165,12 +169,13 @@ export default function Customer() {
       })
       .then((response) => {
         console.log(response.data)
-        toast.success(response.data.message)
+        toast.success(`PO No: ${formData.poNo} created successfully`)
         resetForm()
       })
       .catch((error) => {
-        toast.error(error.response.data.error)
+        toast.error("ERROR: Invalid/Missing Input Data")
         console.log(error.response.data.error)
+        return
       })
   }
 
@@ -259,7 +264,7 @@ export default function Customer() {
   const [kit, setKit] = useState()
 
   useEffect(() => {
-    console.log(formData.customerId)
+    console.log("useEffect CustID:",formData.customerId)
     api
       .get("/customerName", {
         params: {
@@ -267,7 +272,7 @@ export default function Customer() {
         },
       })
       .then((response) => {
-        console.log("response_data: ", response.data)
+        console.log("Customer Name: ", response.data)
         setFormData((prevFormData) => ({
           ...prevFormData,
           consigneeId: formData.customerId,
@@ -277,7 +282,7 @@ export default function Customer() {
       })
 
       .catch((error) => {
-        resetForm()
+        toast.error("UNKNOWN ERROR")  
         console.log(error.data.error)
       })
   }, [formData.customerId])
@@ -338,7 +343,7 @@ export default function Customer() {
           },
         })
         .then((response) => {
-          console.log("response_data: ", response.data)
+          console.log("New Consignee Name: ", response.data)
           setFormData((prevFormData) => ({
             ...prevFormData,
             consigneeName: response.data.customer_name,
@@ -346,6 +351,8 @@ export default function Customer() {
         })
         .catch((error) => {
           console.log(error.data.error)
+          toast.error("ERROR: Invalid Consignee ID")
+          return
         })
     } else if (formData.consigneeId === "") {
       setFormData((prevFormData) => ({
@@ -381,6 +388,7 @@ export default function Customer() {
                     required={true}
                   />
                 </div>
+                {/*
                 <div className="autocomplete-wrapper">
                   <AutoCompleteComponent
                     data={purchaseOrder}
@@ -396,6 +404,21 @@ export default function Customer() {
                     required={true}
                   />
                 </div>
+                */}
+                <div>
+                  <input
+                    type="text"
+                    name="poNo"
+                    value={formData.poNo}
+                    onChange={handleChange}
+                    placeholder="Customer PO No."
+                    required={true}
+                  />
+                  <label
+                    alt="Customer PO No."
+                    placeholder="Customer PO No."
+                  ></label>
+                </div>
                 <div>
                   <div className="datePickerContainer">
                     <Space direction="vertical">
@@ -408,6 +431,7 @@ export default function Customer() {
                         }
                         format="DD-MM-YYYY"
                         placeholder={"PO Date"}
+                        required={true}
                       />
                       {formData.poDate && (
                         <label className="poLabel">PO Date</label>

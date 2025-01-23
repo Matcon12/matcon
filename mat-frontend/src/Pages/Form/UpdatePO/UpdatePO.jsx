@@ -220,6 +220,7 @@ export default function UpdatePO() {
           })
           .catch((error) => {
             console.log(error.response.data.error)
+            toast.error("ERROR in Fetching Data")
           })
   }
 
@@ -264,6 +265,7 @@ export default function UpdatePO() {
       })
       .catch((error) => {
         console.error("Error updating data: ", error)
+        toast.error("ERROR: Invalid/Missing Input Data")
       })
   }
 
@@ -330,21 +332,25 @@ export default function UpdatePO() {
 
   function parsePackSize(packSize) {
     // Use a regular expression to match the quantity and UOM
-    const regex = /^(\d+)\s*(\w+)$/
+    // const regex = /^(\d+)\s*(\w+)$/
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i; 
     const match = packSize.match(regex)
 
     if (match) {
       return {
-        quantity: parseInt(match[1], 10),
+        quantity: parseFloat(match[1]),
         uom: match[2],
       }
     } else {
+      //toast.error("Invalid Pack Size Format")  
       throw new Error("Invalid pack size format")
+      return
     }
   }
 
   useEffect(() => {
-    if (!isInitialLoad && searchData.prod_code) {
+//  if (!isInitialLoad && searchData.prod_code) {
+    if (searchData.prod_code) {   
       api
         .get("/packSize", {
           params: {
@@ -352,10 +358,11 @@ export default function UpdatePO() {
           },
         })
         .then((response) => {
-          console.log(response.data)
+          console.log("Response Data:",response.data)
           try {
             const { uom } = parsePackSize(response.data.pack_size)
-            console.log(uom)
+            console.log("PkSz:",response.data.pack_size)
+            console.log("UoM:",uom)
             setSearchData((prevData) => ({
               ...prevData,
               pack_size: response.data.pack_size,
@@ -363,11 +370,11 @@ export default function UpdatePO() {
               uom: uom,
             }))
           } catch (error) {
-            console.error(error.message)
+            console.error("Inside:",error.message)
           }
         })
         .catch((error) => {
-          console.log(error.response.data.error)
+          console.log("Outside:",error.response.data.error)
         })
     }
   }, [searchData.prod_code])
@@ -451,6 +458,7 @@ export default function UpdatePO() {
                         }
                         format="DD-MM-YYYY"
                         placeholder={"PO Date"}
+                        required={true}
                       />
                       {searchData.podate && (
                         <label className="poLabel">PO Date</label>
@@ -551,7 +559,7 @@ export default function UpdatePO() {
                     /*required={true}*/
                     name="pack_size"
                     value={searchData.pack_size}
-                    onChange={handleChangeData}
+                    //onChange={handleChangeData}
                     placeholder=" "
                     readOnly
                   />

@@ -233,7 +233,7 @@ export default function EditCustomerDetails() {
             <div>
               <input
                 type="text"
-                // //required={true}
+                required={true}
                 name="cust_name"
                 value={formData.cust_name}
                 onChange={handleChange}
@@ -247,7 +247,7 @@ export default function EditCustomerDetails() {
             <div>
               <input
                 type="text"
-                //required={true}
+                required={true}
                 name="cust_addr1"
                 value={formData.cust_addr1}
                 onChange={handleChange}
@@ -269,7 +269,7 @@ export default function EditCustomerDetails() {
             <div>
               <input
                 type="text"
-                //required={true}
+                required={true}
                 name="cust_city"
                 value={formData.cust_city}
                 onChange={handleChange}
@@ -291,6 +291,7 @@ export default function EditCustomerDetails() {
                 name="cust_st_name"
                 placeholder="State Name"
                 search_value="state_name"
+                required={true}
               />
             </div>
             <div>
@@ -311,7 +312,7 @@ export default function EditCustomerDetails() {
             <div>
               <input
                 type="text"
-                //required={true}
+                required={true}
                 name="cust_pin"
                 value={formData.cust_pin}
                 onChange={handleChange}
@@ -325,7 +326,7 @@ export default function EditCustomerDetails() {
             <div>
               <input
                 type="text"
-                //required={true}
+                required={true}
                 name="cust_gst_id"
                 value={formData.cust_gst_id}
                 onChange={handleChange}

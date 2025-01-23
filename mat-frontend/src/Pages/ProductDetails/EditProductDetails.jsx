@@ -45,16 +45,19 @@ export default function EditProductDetails() {
 
   function parsePackSize(packSize) {
     // Use a regular expression to match the quantity and UOM
-    const regex = /^(\d+)\s*(\w+)$/
+    // const regex = /^(\d+)\s*(\w+)$/
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i; 
     const match = packSize.match(regex)
 
     if (match) {
       return {
-        quantity: parseInt(match[1], 10),
+        quantity: parseFloat(match[1]),
         uom: match[2],
       }
     } else {
+      toast.error("Invalid Pack Size Format") 
       throw new Error("Invalid pack size format")
+      return
     }
   }
 
@@ -86,9 +89,9 @@ export default function EditProductDetails() {
         toast.success("Successfully fetched data!!")
       })
       .catch((error) => {
-        resetForm()
+        toast.error("Failed to fetch data") 
         console.log(error.response.data.error)
-        toast.error("Failed to fetch data")
+        resetForm()
       })
   }
 
@@ -158,7 +161,7 @@ export default function EditProductDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="supp_id"
                 value={formData.supp_id}
                 onChange={handleChange}
@@ -172,7 +175,7 @@ export default function EditProductDetails() {
             <div>
               <input
                 type="text"
-                // required={true}
+                required={true}
                 name="prod_desc"
                 value={formData.prod_desc}
                 onChange={handleChange}
@@ -211,7 +214,7 @@ export default function EditProductDetails() {
               <div>
                 <input
                   type="number"
-                  // required={true}
+                  required={true}
                   name="pack_size"
                   value={packSizeData.pack_size}
                   onChange={handlePackSizeChange}
@@ -238,7 +241,7 @@ export default function EditProductDetails() {
                   name="uom"
                   value={packSizeData.uom}
                   onChange={handlePackSizeChange}
-                  // required
+                  required
                 >
                   <option value="" disabled>
                     Select an option
