@@ -56,7 +56,7 @@ export default function InvoicePrint() {
             // Calculate total pages based on the scroll height and window height
             const contentHeight = componentRef.current.scrollHeight
             const pageHeight = window.innerHeight // Approximate page height
-            const pages = Math.ceil(contentHeight / pageHeight)
+            const pages = Math.floor(contentHeight / pageHeight)
 
             setTotalPages(pages) // Set total pages in state to trigger a re-render
           }
@@ -70,14 +70,36 @@ export default function InvoicePrint() {
   })
 
   const InvoiceC = React.forwardRef((props, ref) => {
+    const pageRefs = useRef([])
+
+    useEffect(() => {
+      // Clear the refs array before adding new refs
+      pageRefs.current = []
+
+      // Ensure page numbers are assigned correctly
+      setTimeout(() => {
+        if (pageRefs.current.length > 0) {
+          pageRefs.current.forEach((el, index) => {
+            if (el) {
+              el.innerText = index + 1 // Dynamically set the correct page number
+            }
+          })
+        }
+      }, 0) // Allow time for DOM updates
+    }, [totalPages])
+
     return (
       <div ref={ref} className="invoice-container-container">
-        <Invoice ref={ref} formData={responseData} rates={rates} />
+        <Invoice formData={responseData} rates={rates} />
         <div className="print-footer">
-          Page <span className="pageNumber"></span>
-          {/*Page <span className="pageNumber"></span> of{" "}
-          <span className="totalPages">{totalPages}</span>{" "}*/}
-          {/* Display the correct total page count */}
+          Page{" "}
+          <span
+            className="pageNumber"
+            ref={(el) => {
+              if (el) pageRefs.current.push(el) // Add new refs dynamically
+            }}
+          ></span>{" "}
+          of <span className="totalPages">{totalPages}</span>
         </div>
       </div>
     )

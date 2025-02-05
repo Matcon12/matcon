@@ -1,4 +1,4 @@
-import "./CompletePage.css"
+import "./HomePage.css"
 import { useAuth } from "../../context/AuthContext"
 import { Tabs } from "antd"
 import CustomerHomeCards from "../../components/HomeCards/CustomerHomeCards"

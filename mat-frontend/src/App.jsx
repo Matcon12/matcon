@@ -18,7 +18,7 @@ import Login from "./Pages/Authentication/Login.jsx"
 import ErrorPage from "./Pages/ErrorPage/error-page.jsx"
 
 import "./App.css"
-import CompletePage from "./Pages/CompletePage/CompletePage.jsx"
+import CompletePage from "./Pages/HomePage/HomePage.jsx"
 
 import ProtectedLayout from "./helper/ProtectedLayout.jsx"
 import InvoiceReport from "./Pages/ViewPrint/InvoicePrint.jsx"
@@ -30,6 +30,7 @@ import { useAuth } from "./context/AuthContext.jsx"
 import InvoicePrint from "./Pages/ViewPrint/InvoicePrint.jsx"
 
 import PermissionRoute from "./Route/PermissionRoute.jsx"
+import OutstandingPO from "./Pages/OutstandingPO/OutstandingPO.jsx"
 
 export default function App() {
   const location = useLocation()
@@ -91,12 +92,11 @@ export default function App() {
               />
               <Route path="print">
                 <Route index element={<InvoicePrint />} />
-                {/* <Route path="invoice-print" element={<InvoiceReport />} />
-                <Route path="dc-print" element={<DcReport />} /> */}
               </Route>
               <Route path="report">
                 <Route index element={<InvoiceReportInput />} />
               </Route>
+              <Route path="outstandingPO" element={<OutstandingPO />} />
             </Route>
             <Route
               path="signup"

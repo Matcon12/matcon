@@ -121,7 +121,7 @@ export default function UpdatePO() {
               podate: formattedPoDate,
               po_validity: formattedValidityDate,
               quote_id: data.quote_id,
-              customer_id: data.customer_id,
+              customer_id: data.cust,
               consignee_id: data.consignee_id,
               po_sl_no: data.po_sl_no,
               prod_code: data.prod_code,
@@ -180,7 +180,7 @@ export default function UpdatePO() {
           })
           .then((response) => {
             const data = response.data.data
-            console.log("response: ", response.data.filtered_data)
+            console.log("response: ", data)
             setKitData(response.data.filtered_data)
             setPoslnos(response.data.po_sl_nos)
             console.log(response.data.po_sl_nos)
@@ -199,7 +199,7 @@ export default function UpdatePO() {
               podate: formattedPoDate,
               po_validity: formattedValidityDate,
               quote_id: data.quote_id,
-              customer_id: data.customer_id,
+              customer_id: data.cust,
               consignee_id: data.consignee_id,
               po_sl_no: data.po_sl_no,
               prod_code: data.prod_code,
@@ -333,7 +333,7 @@ export default function UpdatePO() {
   function parsePackSize(packSize) {
     // Use a regular expression to match the quantity and UOM
     // const regex = /^(\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i; 
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i
     const match = packSize.match(regex)
 
     if (match) {
@@ -342,15 +342,15 @@ export default function UpdatePO() {
         uom: match[2],
       }
     } else {
-      //toast.error("Invalid Pack Size Format")  
+      //toast.error("Invalid Pack Size Format")
       throw new Error("Invalid pack size format")
       return
     }
   }
 
   useEffect(() => {
-//  if (!isInitialLoad && searchData.prod_code) {
-    if (searchData.prod_code) {   
+    //  if (!isInitialLoad && searchData.prod_code) {
+    if (searchData.prod_code) {
       api
         .get("/packSize", {
           params: {
@@ -358,11 +358,11 @@ export default function UpdatePO() {
           },
         })
         .then((response) => {
-          console.log("Response Data:",response.data)
+          console.log("Response Data:", response.data)
           try {
             const { uom } = parsePackSize(response.data.pack_size)
-            console.log("PkSz:",response.data.pack_size)
-            console.log("UoM:",uom)
+            console.log("PkSz:", response.data.pack_size)
+            console.log("UoM:", uom)
             setSearchData((prevData) => ({
               ...prevData,
               pack_size: response.data.pack_size,
@@ -370,11 +370,11 @@ export default function UpdatePO() {
               uom: uom,
             }))
           } catch (error) {
-            console.error("Inside:",error.message)
+            console.error("Inside:", error.message)
           }
         })
         .catch((error) => {
-          console.log("Outside:",error.response.data.error)
+          console.log("Outside:", error.response.data.error)
         })
     }
   }, [searchData.prod_code])
@@ -572,16 +572,17 @@ export default function UpdatePO() {
                   <select
                     name="uom"
                     value={searchData.uom}
-//                    onChange={handleChangeData}
+                    //                    onChange={handleChangeData}
                     readOnly
                     // required
                   >
-//                    <option value="" disabled>
-//                      Select an option
-//                    </option>
-//                    <option value="Ltr">Ltr</option>
-//                    <option value="Kg">Kg</option>
-//                    <option value="No.">No.</option>
+                    //{" "}
+                    <option value="" disabled>
+                      // Select an option //{" "}
+                    </option>
+                    // <option value="Ltr">Ltr</option>
+                    // <option value="Kg">Kg</option>
+                    // <option value="No.">No.</option>
                   </select>
                   <label alt="Select an Option" placeholder="UOM"></label>
                 </div>
@@ -593,7 +594,7 @@ export default function UpdatePO() {
                     value={searchData.quantity}
                     onChange={handleChangeData}
                     placeholder=" "
-//                    readOnly
+                    //                    readOnly
                   />
                   <label
                     alt="Enter the Quantity"
@@ -622,7 +623,7 @@ export default function UpdatePO() {
                     value={searchData.unit_price}
                     onChange={handleChangeData}
                     placeholder=" "
-//                    readOnly
+                    //                    readOnly
                   />
                   <label
                     alt="Enter the Unit Price"

@@ -52,6 +52,14 @@ export default function CustomerHomeCards() {
             redirect="report"
             onClickCard={onClickCard}
           />
+          <Card
+            className="card-7"
+            img="/011-outstandingPO.png"
+            hoverImg="/011-outstandingPO-1.png"
+            name="Outstanding PO"
+            redirect="outstandingPO"
+            onClickCard={onClickCard}
+          />
         </div>
       </div>
     </>

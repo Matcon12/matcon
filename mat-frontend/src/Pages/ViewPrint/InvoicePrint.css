@@ -9,6 +9,11 @@
   display: flex;
   justify-content: center;
 }
+.input-details-OPOform {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
 h3 {
   text-align: center;
@@ -50,20 +55,20 @@ h3 {
 
 @media print {
   @page {
-    size: auto;
+    size: a4;
   }
 
   body {
-    counter-reset: page;
+    counter-increment: page;
   }
 
-  .invoice-container-container {
+  .invoice-container {
     page-break-after: always;
   }
 
   body,
   .invoice-report-container,
-  .invoice-container-container {
+  .invoice-container {
     background-color: transparent;
     color: black;
   }
@@ -85,7 +90,10 @@ h3 {
     content: attr(data-total);
   }
 
-  body {
-    counter-increment: page;
+  footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
   }
 }

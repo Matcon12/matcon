@@ -36,5 +36,6 @@ urlpatterns = [
   path("getContactNames", views.get_contact_names, name="contactNames"),
   path("updateUserStatus", views.update_user_status, name="update_user_status"),
   path("printInvoicePageData", views.print_invoice_page_data, name="print_invoice_page_data"),
-  path("deleteUser", views.delete_user, name="delte_user")
+  path("deleteUser", views.delete_user, name="delte_user"),
+  path("outstandingPO", views.outstanding_PO, name="outstanding_PO")
 ]

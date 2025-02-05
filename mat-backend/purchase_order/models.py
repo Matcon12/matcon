@@ -32,23 +32,22 @@ class CustomerMaster(models.Model):
 
 
 class CustomerPurchaseOrder(models.Model):
-    slno = models.AutoField(primary_key=True)  # The composite primary key (slno, pono, customer_id, po_sl_no) found, that is not supported. The first column is selected.
-    pono = models.CharField(max_length=100)
+    slno = models.AutoField(primary_key=True)
+    pono = models.TextField(blank=True, null=True)
     podate = models.DateField(blank=True, null=True)
-    quote_id = models.CharField(max_length=15, blank=True, null=True)
+    quote_id = models.TextField(blank=True, null=True)
     quote_date = models.DateField(blank=True, null=True)
-    customer_id = models.CharField(max_length=30)
-    consignee_id = models.CharField(max_length=30, blank=True, null=True)
-    po_sl_no = models.CharField(max_length=10)
-    prod_code = models.CharField(max_length=50, blank=True, null=True)
-    prod_desc = models.CharField(max_length=150, blank=True, null=True)
-    additional_desc = models.CharField(max_length=50, blank=True, null=True)
-    # omat = models.CharField(max_length=50, blank=True, null=True)
-    pack_size = models.CharField(max_length=10, blank=True, null=True)
+    cust = models.ForeignKey(CustomerMaster, models.DO_NOTHING, blank=True, null=True)
+    consignee_id = models.TextField(blank=True, null=True)
+    po_sl_no = models.TextField(blank=True, null=True)
+    prod_code = models.TextField(blank=True, null=True)
+    prod_desc = models.TextField(blank=True, null=True)
+    additional_desc = models.TextField(blank=True, null=True)
+    pack_size = models.TextField(blank=True, null=True)
     quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
-    uom = models.CharField(max_length=5, blank=True, null=True)
-    hsn_sac = models.CharField(max_length=10, blank=True, null=True)
+    uom = models.TextField(blank=True, null=True)
+    hsn_sac = models.TextField(blank=True, null=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     qty_balance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     qty_sent = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float

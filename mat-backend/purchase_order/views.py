@@ -26,7 +26,7 @@ from rest_framework.authtoken.models import Token
 from django.forms.models import model_to_dict
 from collections import Counter
 from django.core.exceptions import ValidationError
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, InvalidOperation
 from .serializers import UserSerializer
 
 import logging
@@ -160,7 +160,7 @@ def submit_form(request):
                         podate=formData.get('poDate'),
                         quote_id=formData.get('quoteId'),
                         quote_date=formData.get('poValidity'),
-                        customer_id=formData.get('customerId'),
+                        cust_id=formData.get('customerId'),
                         consignee_id=formData.get('consigneeId'),
                         po_sl_no=product.get('poSlNo'),
                         prod_code=product.get('prodId'),
@@ -257,7 +257,7 @@ def get_data_po_cust(request):
             po_no = request.GET.get('po_no')
             po_sl_no = request.GET.get('po_sl_no')
             if cust_id and po_no and po_sl_no:
-                data = list(CustomerPurchaseOrder.objects.filter(customer_id=cust_id, pono=po_no, po_sl_no=po_sl_no).order_by('po_sl_no').values())
+                data = list(CustomerPurchaseOrder.objects.filter(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no).order_by('po_sl_no').values())
                 po_nos = CustomerPurchaseOrder.objects.filter(pono=po_no).values_list('po_sl_no', flat=True).order_by('po_sl_no')
                 filtered_po_sl_nos = [no for no in po_nos if no.startswith(po_sl_no + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
@@ -300,7 +300,7 @@ def update_purchase_order(request):
                 return JsonResponse({'error': 'Missing required fields'}, status=400)
 
             # Fetch the record to update
-            record = CustomerPurchaseOrder.objects.get(customer_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
+            record = CustomerPurchaseOrder.objects.get(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
 
             # Update the record with new values from searchData
             search_data = result.get('searchData', {})
@@ -331,7 +331,7 @@ def update_purchase_order(request):
 
                 try:
                     # Fetch the kit record to update
-                    kit_record = CustomerPurchaseOrder.objects.get(customer_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
+                    kit_record = CustomerPurchaseOrder.objects.get(cust_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
 
                     # Update the kit record with new values from kitData
                     for key, value in kit_item.items():
@@ -610,7 +610,7 @@ def invoice_processing(request):
             'podate': None,
             'quote_id': '',
             'quote_date': None,
-            'customer_id': '',
+            'cust_id': '',
             'consignee_id': '',
             'po_sl_no': 'fr',
             'prod_code': '',
@@ -650,7 +650,7 @@ def invoice_processing(request):
             'podate': None,
             'quote_id': '',
             'quote_date': None,
-            'customer_id': '',
+            'cust_id': '',
             'consignee_id': '',
             'po_sl_no': 'ins',
             'prod_code': '',
@@ -690,7 +690,7 @@ def invoice_processing(request):
             'podate': None,
             'quote_id': '',
             'quote_date': None,
-            'customer_id': '',
+            'cust_id': '',
             'consignee_id': '',
             'po_sl_no': 'oc',
             'prod_code': '',
@@ -900,7 +900,7 @@ def invoice_processing(request):
         if index not in skip_index:
             try:
                 record = CustomerPurchaseOrder.objects.get(
-                    customer_id=row['customer_id'],
+                    cust_id=row['customer_id'],
                     pono=row['pono'],
                     po_sl_no=row['po_sl_no']
                 )
@@ -1065,7 +1065,7 @@ def get_invoice_data(request):
                     
                 print('contact: ', contact_names)
                 
-                cust_id = result_first.customer_id
+                cust_id = result_first.cust_id
                 consignee_id = result_first.consignee_id
                 invoice_header_data = {
                     'customerId': cust_id,
@@ -1240,8 +1240,8 @@ def invoice_report(request):
             df1 = df[['Invoice Number', 'Customer Name', 'Customer GST IN', 'HSN/SAC']].drop_duplicates()
             df2 = df[['Invoice Number', 'Customer Name', 'Customer GST IN']].drop_duplicates()
 
-            df1['Customer GST IN'].fillna('', inplace=True)
-            df2['Customer GST IN'].fillna('', inplace=True)
+            df1['Customer GST IN'] = df1['Customer GST IN'].fillna('')
+            df2['Customer GST IN'] = df2['Customer GST IN'].fillna('')
 
             df1 = df1.sort_values(by="Invoice Number", ascending=True)
             df2 = df2.sort_values(by="Invoice Number", ascending=True)
@@ -1321,8 +1321,10 @@ def invoice_report(request):
                 axis=1
             )
 
-            combined_df[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']] = combined_df[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']].apply(lambda x: x.map('{:.2f}'.format))
-            combined_df2[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']] = combined_df2[['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']].apply(lambda x: x.map('{:.2f}'.format))
+            # Convert numeric columns to appropriate types without formatting
+            numeric_columns = ['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
+            combined_df[numeric_columns] = combined_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+            combined_df2[numeric_columns] = combined_df2[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
             combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
@@ -1331,7 +1333,7 @@ def invoice_report(request):
             combined_df = combined_df[column_order]
             combined_df2 = combined_df2[column_order]
 
-            combined_df2['HSN/SAC'].fillna('', inplace=True)
+            combined_df2['HSN/SAC'] = combined_df2['HSN/SAC'].fillna('')
 
             # Convert to JSON
             json_data = combined_df.to_json(orient='records')
@@ -1513,3 +1515,58 @@ def print_invoice_page_data(request):
     gst_rates = GstRates.objects.all()
 
     return JsonResponse({'gst_rates': gst_rates.values()[0]})
+
+@csrf_exempt
+def outstanding_PO(request):
+    try:
+        if request.method == 'GET':
+            # Get query parameters
+            from_date = request.GET.get("from_date")
+            to_date = request.GET.get("to_date")
+            cust_id = request.GET.get("cust_id")
+
+            # Validate the date format
+            try:
+                from_date = datetime.strptime(from_date, '%d-%m-%Y')
+                to_date = datetime.strptime(to_date, '%d-%m-%Y')
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date format. Use DD-MM-YYYY'}, status=400)
+
+            # Build the filter conditions
+            filter_conditions = {
+                'podate__range': (from_date, to_date),
+                'qty_balance__gt': 0
+            }
+
+            # If cust_id is provided, add it to the filter conditions
+            if cust_id:
+                filter_conditions['cust_id'] = cust_id
+
+            # Filter the data based on the conditions
+            purchase_orders = CustomerPurchaseOrder.objects.filter(**filter_conditions)
+
+            # Prepare the data to return
+            data = [
+                {
+                    'Cust ID': po.cust_id,
+                    'Customer Name': po.cust.cust_name,
+                    'PO no.': po.pono,
+                    'PO Date': po.podate,
+                    'PO Sl no.': po.po_sl_no,
+                    'Unit Price': float(round(po.unit_price, 2)),  
+                    'Total Quantity': float(round(po.quantity, 2)),
+                    'Quantity Sent': float(round(po.qty_sent, 2)),
+                    'Realised Value': float(round(po.unit_price * po.qty_sent, 2)),
+                    'Quantity Balance': float(round(po.qty_balance, 2)),
+                    'Outstanding Value': float(round(po.unit_price * po.qty_balance, 2))
+                }
+                for po in purchase_orders
+            ]
+
+            return JsonResponse({'purchase_order': data}, status=200)
+
+        # Return an error response for unsupported methods
+        return JsonResponse({'error': 'Invalid HTTP method'}, status=405)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
