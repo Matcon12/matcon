@@ -153,6 +153,7 @@ def submit_form(request):
 
                     unit_price = round_decimal(product.get('unitPrice', 0))
                     total_price = round_decimal(product.get('totalPrice', 0))
+                    qty = round_decimal(product.get('quantity',0))
 
                     order = CustomerPurchaseOrder(
                         slno=new_slno,
@@ -168,12 +169,12 @@ def submit_form(request):
                         additional_desc=product.get('msrr'),
                         hsn_sac=product.get('hsn_sac'),
                         pack_size=product.get('packSize'),
-                        quantity=product.get('quantity'),
+                        quantity=qty,
                         unit_price=unit_price,
                         uom=product.get('uom'),
                         total_price=total_price,
                         qty_sent=0.00,
-                        qty_balance=product.get('quantity'),
+                        qty_balance=qty,
                         delivery_date=delivery_date,
                         po_validity=formData.get('poValidity'),
                     )

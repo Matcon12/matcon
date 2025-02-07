@@ -44,13 +44,13 @@ class CustomerPurchaseOrder(models.Model):
     prod_desc = models.TextField(blank=True, null=True)
     additional_desc = models.TextField(blank=True, null=True)
     pack_size = models.TextField(blank=True, null=True)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
+    quantity = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
+    unit_price = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     uom = models.TextField(blank=True, null=True)
     hsn_sac = models.TextField(blank=True, null=True)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
-    qty_balance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
-    qty_sent = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
+    total_price = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
+    qty_balance = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
+    qty_sent = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     delivery_date = models.DateField(blank=True, null=True)
     po_validity = models.DateField(blank=True, null=True)
 

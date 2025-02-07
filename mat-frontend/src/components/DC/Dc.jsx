@@ -151,6 +151,7 @@ function DcReportC({ formData }) {
             <tr>
               <th>Sl No.</th>
               <th style={{ width: "250px" }}>Description of Goods</th>
+              <th>PO Sl. No.</th>
               <th>No. of packs</th>
               <th>Pack Size</th>
               <th>Total Qty</th>
@@ -179,6 +180,7 @@ function DcReportC({ formData }) {
                         <td rowSpan={group.items.length}>{group.prod_desc}</td>
                       </>
                     )}
+                    <td className="a-right">{data.po_sl_no}</td>
                     <td className="a-right">{totalQty}</td>
                     <td className="a-right">{data.pack_size}</td>
                     <td className="a-right">{data.batch_quantity}</td>

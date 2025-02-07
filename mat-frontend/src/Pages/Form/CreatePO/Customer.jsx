@@ -125,7 +125,7 @@ export default function Customer() {
         console.log("Pack:", qtyUom.qty, "UoM:", qtyUom.u_o_m);
 
         // Ensure that value is a valid, positive integer
-        const parsedQuantity = parseFloat(qnty, 10);
+        const parsedQuantity = parseFloat(qnty);
         if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
           toast.error("Quantity must be a positive number");
           return;

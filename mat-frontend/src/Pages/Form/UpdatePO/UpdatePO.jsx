@@ -627,7 +627,7 @@ export default function UpdatePO() {
                   />
                   <label
                     alt="Enter the Unit Price"
-                    placeholder="Unit Price"
+                    placeholder="Rate per UOM"
                   ></label>
                 </div>
                 <div>
