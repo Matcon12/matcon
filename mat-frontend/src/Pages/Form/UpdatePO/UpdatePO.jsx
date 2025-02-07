@@ -347,7 +347,7 @@ export default function UpdatePO() {
       return
     }
   }
-
+{/*
   useEffect(() => {
     //  if (!isInitialLoad && searchData.prod_code) {
     if (searchData.prod_code) {
@@ -378,7 +378,7 @@ export default function UpdatePO() {
         })
     }
   }, [searchData.prod_code])
-
+*/}
   return (
     <div className="customer-container">
       <div className="complete-form-container">
