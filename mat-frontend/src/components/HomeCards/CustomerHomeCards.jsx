@@ -56,7 +56,7 @@ export default function CustomerHomeCards() {
             className="card-7"
             img="/011-outstandingPO.png"
             hoverImg="/011-outstandingPO-1.png"
-            name="Outstanding PO"
+            name="Outstanding PO Report"
             redirect="outstandingPO"
             onClickCard={onClickCard}
           />

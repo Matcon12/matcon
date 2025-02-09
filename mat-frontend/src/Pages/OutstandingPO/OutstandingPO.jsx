@@ -15,9 +15,17 @@ export default function OutstandingPO() {
   }
 
   const [formData, setFormData] = useState(initialFormData)
-
   const [customerData, setCustomerData] = useState()
   const [filteredCustomerData, setFilteredCustomerData] = useState()
+
+  const numericFields = [
+    "Unit Price",
+    "Total Quantity",
+    "Quantity Sent",
+    "Realised Value",
+    "Quantity Balance",
+    "Outstanding Value",
+  ]
 
   const onStartDateChange = (date, dateString) => {
     setFormData((prevFormData) => ({
@@ -52,12 +60,29 @@ export default function OutstandingPO() {
       })
       .then((response) => {
         if (response.status === 200) {
-          const responseData = response.data.purchase_order // You don't need to declare this twice
-          console.log(responseData) // Log the data from the response
+          const responseData = response.data.purchase_order
+          console.log(responseData)
 
           if (responseData.length != 0) {
             console.log("entered")
             const ws = XLSX.utils.json_to_sheet(responseData)
+
+            // Convert numeric fields to numbers
+            const range = XLSX.utils.decode_range(ws["!ref"])
+            for (let C = range.s.c; C <= range.e.c; C++) {
+              const header = XLSX.utils.encode_col(C) + "1"
+              const headerValue = ws[header].v
+
+              if (numericFields.includes(headerValue)) {
+                for (let R = range.s.r + 1; R <= range.e.r; R++) {
+                  const cell = XLSX.utils.encode_cell({ r: R, c: C })
+                  if (ws[cell]) {
+                    ws[cell].v = parseFloat(ws[cell].v) // Convert to number
+                    ws[cell].t = "n" // Set cell type to number
+                  }
+                }
+              }
+            }
 
             const htmlString = XLSX.write(
               { Sheets: { Sheet1: ws }, SheetNames: ["Sheet1"] },
@@ -159,7 +184,7 @@ export default function OutstandingPO() {
         }
       })
       .catch((e) => {
-        console.error(e) // Log any errors that occur during the request
+        console.error(e)
       })
   }
 
@@ -175,6 +200,26 @@ export default function OutstandingPO() {
     newWindow.downloadExcel = function () {
       try {
         const wb = XLSX.read(htmlString, { type: "binary" })
+        const ws = wb.Sheets["Sheet1"]
+
+        // Set number format for numeric columns
+        const range = XLSX.utils.decode_range(ws["!ref"])
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const header = XLSX.utils.encode_col(C) + "1"
+          const headerValue = ws[header].v
+
+          if (numericFields.includes(headerValue)) {
+            for (let R = range.s.r + 1; R < range.e.r; R++) {
+              const cell = XLSX.utils.encode_cell({ r: R, c: C })
+              if (ws[cell]) {
+                ws[cell].v = parseFloat(ws[cell].v) // Convert to number
+                ws[cell].t = "n" // Set cell type to number
+                ws[cell].z = "#,##0.00" // Set number format with 2 decimal places
+              }
+            }
+          }
+        }
+
         XLSX.writeFile(wb, "Outstanding_PO.xlsx")
       } catch (error) {
         console.error("Error downloading Excel file", error)

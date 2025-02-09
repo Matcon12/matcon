@@ -36,24 +36,20 @@ export default function InvoiceReportInput() {
       })
       .then((response) => {
         if (response.status === 200) {
-          console.log(response.data)
           const responseData = response.data
 
-          console.log("responseData: ", responseData)
-
           if (responseData) {
-            if (responseData) {
-              const ws = XLSX.utils.json_to_sheet(responseData.data)
+            const ws = XLSX.utils.json_to_sheet(responseData.data)
 
-              const htmlString = XLSX.write(
-                { Sheets: { Sheet1: ws }, SheetNames: ["Sheet1"] },
-                { bookType: "html", bookSST: true, type: "binary" }
-              )
+            const htmlString = XLSX.write(
+              { Sheets: { Sheet1: ws }, SheetNames: ["Sheet1"] },
+              { bookType: "html", bookSST: true, type: "binary" }
+            )
 
-              const bootstrapLink =
-                '<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">'
+            const bootstrapLink =
+              '<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">'
 
-              const htmlWithStyles = `
+            const htmlWithStyles = `
               <html>
                 <head>
                   ${bootstrapLink}
@@ -125,7 +121,11 @@ export default function InvoiceReportInput() {
                                     index >= 6
                                       ? 'style="text-align: right;"'
                                       : ""
-                                  return `<td ${alignRight}>${value}</td>`
+                                  const formattedValue =
+                                    typeof value === "number"
+                                      ? value.toFixed(2)
+                                      : value
+                                  return `<td ${alignRight}>${formattedValue}</td>`
                                 })
                                 .join("")}</tr>`
                           )
@@ -156,7 +156,11 @@ export default function InvoiceReportInput() {
                                     index >= 6
                                       ? 'style="text-align: right;"'
                                       : ""
-                                  return `<td ${alignRight}>${value}</td>`
+                                  const formattedValue =
+                                    typeof value === "number"
+                                      ? value.toFixed(2)
+                                      : value
+                                  return `<td ${alignRight}>${formattedValue}</td>`
                                 })
                                 .join("")}</tr>`
                           )
@@ -170,8 +174,7 @@ export default function InvoiceReportInput() {
               </html>
             `
 
-              downloadInvoiceReport(htmlString, htmlWithStyles)
-            }
+            downloadInvoiceReport(htmlString, htmlWithStyles)
           }
         }
       })
@@ -192,7 +195,38 @@ export default function InvoiceReportInput() {
     newWindow.downloadExcel = function () {
       try {
         const wb = XLSX.read(htmlString, { type: "binary" })
-        XLSX.writeFile(wb, "invoiceReports.xlsx")
+        const ws = wb.Sheets["Sheet1"]
+
+        // Define numeric fields
+        const numericFields = [
+          "Quantity",
+          "Ass.Value",
+          "IGST Price (18%)",
+          "CGST Price (9%)",
+          "SGST Price (9%)",
+          "Round Off",
+          "Invoice Value",
+        ] // Adjust this array based on your data
+
+        // Set number format for numeric columns
+        const range = XLSX.utils.decode_range(ws["!ref"])
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const header = XLSX.utils.encode_col(C) + "1"
+          const headerValue = ws[header].v
+
+          if (numericFields.includes(headerValue)) {
+            for (let R = range.s.r + 1; R <= range.e.r; R++) {
+              const cell = XLSX.utils.encode_cell({ r: R, c: C })
+              if (ws[cell]) {
+                ws[cell].v = parseFloat(ws[cell].v) // Convert to number
+                ws[cell].t = "n" // Set cell type to number
+                ws[cell].z = "#,##0.00" // Set number format with 2 decimal places
+              }
+            }
+          }
+        }
+
+        XLSX.writeFile(wb, "Outstanding_PO.xlsx")
       } catch (error) {
         console.error("Error downloading Excel file", error)
       }

@@ -1270,7 +1270,7 @@ def invoice_report(request):
                 'Invoice Number': '',
                 'HSN/SAC': '',
                 'Quantity': '',
-                'Ass.Value': total_taxable_amt,
+                'Ass.Value': total_taxable_amt.round(2),
                 'CGST Price (9%)': total_cgst_price,
                 'SGST Price (9%)': total_sgst_price,
                 'IGST Price (18%)': total_igst_price,
@@ -1516,8 +1516,23 @@ def print_invoice_page_data(request):
 
     return JsonResponse({'gst_rates': gst_rates.values()[0]})
 
+
+"""
+Outstanding Purchase Orders API Endpoint
+--------------------------------------
+
+Technical Note:
+    All numeric values are returned as strings (e.g., "100.00" instead of 100) to maintain
+    exact decimal representation during JSON serialization. This ensures consistent display
+    of decimal places, as JSON doesn't preserve trailing zeros during number serialization.
+"""
+
 @csrf_exempt
 def outstanding_PO(request):
+    def format_number(value):
+        """Format number to always show 2 decimal places as string"""
+        return '{:.2f}'.format(float(value))
+
     try:
         if request.method == 'GET':
             # Get query parameters
@@ -1545,23 +1560,54 @@ def outstanding_PO(request):
             # Filter the data based on the conditions
             purchase_orders = CustomerPurchaseOrder.objects.filter(**filter_conditions)
 
+            # Initialize totals
+            total_realised_value = 0
+            total_outstanding_value = 0
+
             # Prepare the data to return
-            data = [
-                {
+            data = []
+            for index, po in enumerate(purchase_orders, start=1):
+                # Calculate values
+                realised_value = float(po.unit_price * po.qty_sent)
+                outstanding_value = float(po.unit_price * po.qty_balance)
+
+                total_realised_value += realised_value
+                total_outstanding_value += outstanding_value
+
+                data.append({
+                    'Sl. No.': index,  # Keep as integer
                     'Cust ID': po.cust_id,
                     'Customer Name': po.cust.cust_name,
-                    'PO no.': po.pono,
-                    'PO Date': po.podate,
-                    'PO Sl no.': po.po_sl_no,
-                    'Unit Price': float(round(po.unit_price, 2)),  
-                    'Total Quantity': float(round(po.quantity, 2)),
-                    'Quantity Sent': float(round(po.qty_sent, 2)),
-                    'Realised Value': float(round(po.unit_price * po.qty_sent, 2)),
-                    'Quantity Balance': float(round(po.qty_balance, 2)),
-                    'Outstanding Value': float(round(po.unit_price * po.qty_balance, 2))
-                }
-                for po in purchase_orders
-            ]
+                    'PO No.': po.pono,
+                    'PO Date': po.podate.strftime('%d-%m-%Y'),
+                    'PO Sl. No.': po.po_sl_no,
+                    'Product Code': po.prod_code,
+                    'Pack Size': po.pack_size,
+                    'Unit Price': format_number(po.unit_price),
+                    'Total Quantity': format_number(po.quantity),
+                    'Quantity Sent': format_number(po.qty_sent),
+                    'Realised Value': format_number(realised_value),
+                    'Quantity Balance': format_number(po.qty_balance),
+                    'Outstanding Value': format_number(outstanding_value)
+                })
+
+            # Add a new row for the totals
+            data.append({
+                'Sl. No.': 'Total',
+                'Cust ID': '',
+                'Customer Name': '',
+                'PO No.': '',
+                'PO Date': '',
+                'PO Sl. No.': '',
+                'Product Code': '',
+                'Pack Size': '',
+                'Unit Price': '',
+                'Total Quantity': '',
+                'Quantity Sent': '',
+                'Realised Value': format_number(total_realised_value),
+                'Quantity Balance': '',
+                'Outstanding Value': format_number(total_outstanding_value)
+            })
 
             return JsonResponse({'purchase_order': data}, status=200)
 
