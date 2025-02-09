@@ -265,7 +265,7 @@ export default function ProductDetails({
               />
               <label
                 alt="Enter the Unit Price"
-                placeholder="Unit Price"
+                placeholder="Rate per UOM"
               ></label>
             </div>
           ) : null}
@@ -305,11 +305,11 @@ export default function ProductDetails({
             <select
               name="uom"
               value={formData[index].uom}
-              onChange={(e) => handleChange(index, e)}
+              //onChange={(e) => handleChange(index, e)}
             >
-              <option value="" disabled>
+              {/*<option value="" disabled>
                 Select an option
-              </option>
+              </option>*/}
               <option value="Ltr">Ltr</option>
               <option value="Kg">Kg</option>
               <option value="No.">No.</option>
