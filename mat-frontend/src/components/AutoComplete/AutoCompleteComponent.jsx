@@ -108,7 +108,7 @@ export default function AutoCompleteComponent({
           .includes(value.toLowerCase())
       })
       setFilteredData(filtered)
-      setPoSlNo(e.target)
+      setPoSlNo(event.target)
       setIsFocused(false)
       // console.log({ "data": data, "filtered data": filtered })
     }

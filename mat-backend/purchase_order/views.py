@@ -864,6 +864,8 @@ def invoice_processing(request):
             max_slno = OtwDc.objects.aggregate(Max('sl_no'))['sl_no__max']
             new_slno = max_slno + 1 if max_slno else 1
 
+            cust_instance = CustomerMaster.objects.get(cust_id=row.get('cust_id', ''))
+
             OtwDc_instance = OtwDc(
                 sl_no=new_slno,
                 gcn_no=row.get('gcn_no', ''),
@@ -883,7 +885,8 @@ def invoice_processing(request):
                 cgst_price=row.get('cgst_price', ''),
                 sgst_price=row.get('sgst_price', ''),
                 igst_price=row.get('igst_price', ''),
-                cust_id=row.get('cust_id', ''),
+                cust= cust_instance,
+                # cust=row.get('cust_id', ''),
                 hsn_sac=row.get('hsn', ''),
                 batch=row.get('batch_no'),
                 coc=row.get('coc', ''),
@@ -901,7 +904,7 @@ def invoice_processing(request):
         if index not in skip_index:
             try:
                 record = CustomerPurchaseOrder.objects.get(
-                    cust_id=row['customer_id'],
+                    cust_id=row['cust_id'],
                     pono=row['pono'],
                     po_sl_no=row['po_sl_no']
                 )
@@ -909,9 +912,11 @@ def invoice_processing(request):
                 record.qty_sent = float(record.qty_sent) + float(row["qty_tobe_del"])
                 record.save()
             except ObjectDoesNotExist:
-                return JsonResponse({"error": f"Record with cust_id={row['customer_id']}, po_sl_no={row['po_sl_no']} does not exist."}, status=404)
+                return JsonResponse({"error": f"Record with cust_id={row['cust_id']}, po_sl_no={row['po_sl_no']} does not exist."}, status=404)
 
     GstRates.objects.filter(id=1).update(last_gcn_no=new_gcn_no)
+
+    print("The gcn_num after the invoice generation is: ", new_gcn_no)
 
     return JsonResponse({"success": True, "gcn_no": new_gcn_no})
 
@@ -1433,7 +1438,7 @@ def delete_user(request):
             {"error": "Username is required to delete a user."},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+     
     try:
         # Retrieve the user by username
         user = User.objects.get(username=username)

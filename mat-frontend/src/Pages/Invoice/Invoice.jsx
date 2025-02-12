@@ -77,9 +77,13 @@ export default function Invoice() {
   }, [formData.newConsigneeId])
 
   useEffect(() => {
+    //get list of all the purchase order numbers for the autocomplete dropdown
     api.get("/getPurchaseOrder").then((response) => {
+      console.log(response)
       setPurchaseOrder(response.data.distinct_pono)
     })
+
+    //get list of all the customer names for the autocomplete dropdown for new consignee name
     api.get("/getCustomerData").then((response) => {
       setCustomerData(response.data.customerData)
     })
@@ -197,6 +201,7 @@ export default function Invoice() {
         params: { poNo: formData.poNo },
       })
       .then((response) => {
+        console.log(response.data)
         setFormData((prevFormData) => ({
           ...prevFormData,
           customerId: response.data.invoice_header_data.customerId,
