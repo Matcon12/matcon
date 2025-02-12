@@ -121,7 +121,7 @@ export default function UpdatePO() {
               podate: formattedPoDate,
               po_validity: formattedValidityDate,
               quote_id: data.quote_id,
-              customer_id: data.cust,
+              customer_id: data.cust_id,
               consignee_id: data.consignee_id,
               po_sl_no: data.po_sl_no,
               prod_code: data.prod_code,
@@ -252,6 +252,7 @@ export default function UpdatePO() {
 
   const handleUpdate = (e) => {
     e.preventDefault()
+    console.log("update data: ", searchData)
     console.log("kit data: ", kitData)
     api
       .put("/updateForm", { searchInputs, searchData, kitData })
@@ -347,7 +348,8 @@ export default function UpdatePO() {
       return
     }
   }
-{/*
+  {
+    /*
   useEffect(() => {
     //  if (!isInitialLoad && searchData.prod_code) {
     if (searchData.prod_code) {
@@ -378,7 +380,8 @@ export default function UpdatePO() {
         })
     }
   }, [searchData.prod_code])
-*/}
+*/
+  }
   return (
     <div className="customer-container">
       <div className="complete-form-container">
