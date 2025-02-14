@@ -1555,8 +1555,9 @@ def outstanding_PO(request):
 
             # Build the filter conditions
             filter_conditions = {
+            #    'podate__range': (from_date, to_date),
+            #    'qty_balance__gt': 0
                 'podate__range': (from_date, to_date),
-                'qty_balance__gt': 0
             }
 
             # If cust_id is provided, add it to the filter conditions

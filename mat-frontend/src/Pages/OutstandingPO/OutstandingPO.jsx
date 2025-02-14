@@ -144,7 +144,7 @@ export default function OutstandingPO() {
                   </style>
                 </head>
                 <body>
-                  <h2>Outstanding PO</h2>
+                  <h2>Purchase Order Report</h2>
                   <div class="table-responsive">
                     <table class="table table-bordered">
                       <thead>
@@ -161,7 +161,7 @@ export default function OutstandingPO() {
                               `<tr>${Object.values(row)
                                 .map((value, index) => {
                                   const alignRight =
-                                    index >= 6
+                                    index > 6
                                       ? 'style="text-align: right;"'
                                       : ""
                                   return `<td ${alignRight}>${value}</td>`
@@ -230,7 +230,7 @@ export default function OutstandingPO() {
   return (
     <div className="invoice-report-container">
       <div className="input-details-container">
-        <h3>Outstanding PO Report</h3>
+        <h3>Purchase Order Report</h3>
         <form onSubmit={handleSubmit} className="input-details-OPOform">
           <div className="OPOInputs">
             <div className="datesPicker">

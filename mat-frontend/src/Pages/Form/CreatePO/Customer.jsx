@@ -264,6 +264,7 @@ export default function Customer() {
   const [kit, setKit] = useState()
 
   useEffect(() => {
+    if (!formData.customerId) return
     console.log("useEffect CustID:",formData.customerId)
     api
       .get("/customerName", {
@@ -304,61 +305,38 @@ export default function Customer() {
     setIsKit((prevData) => [...prevData, 1])
   }
 
-  // useEffect(() => {
-  //   formData.consigneeId != formData.customerId
-  //     ? api
-  //         .get("/customerName", {
-  //           params: {
-  //             customerId: formData.consigneeId,
-  //           },
-  //         })
-  //         .then((response) => {
-  //           console.log("response_data: ", response.data)
-  //           setFormData((prevFormData) => ({
-  //             ...prevFormData,
-  //             consigneeId: formData.consigneeId,
-  //             consigneeName: response.data.customer_name,
-  //           }))
-  //         })
-
-  //         .catch((error) => {
-  //           // resetForm()
-  //           console.log(error.data.error)
-  //         })
-  //     : ""
-  //   if (formData.consigneeId == "") {
-  //     setFormData((prevFormData) => ({
-  //       ...prevFormData,
-  //       consigneeName: "",
-  //     }))
-  //   }
-  // }, [formData.consigneeId])
-
   useEffect(() => {
-    if (formData.consigneeId && formData.consigneeId !== formData.customerId) {
+    let consID = formData.consigneeId
+    let consNM = formData.consigneeName
+    if (consID !== formData.customerId) {
       api
         .get("/customerName", {
           params: {
-            customerId: formData.consigneeId,
+            customerId: consID,
           },
         })
         .then((response) => {
-          console.log("New Consignee Name: ", response.data)
+          consNM = response.data.customer_name
           setFormData((prevFormData) => ({
             ...prevFormData,
-            consigneeName: response.data.customer_name,
+            consigneeId  : consNM ? consID : formData.customerId,
+            consigneeName: consNM ? consNM : formData.customerName,
           }))
         })
         .catch((error) => {
-          console.log(error.data.error)
-          toast.error("ERROR: Invalid Consignee ID")
-          return
+          console.log("Invalid consigneeID. Making cust-ID as Cons-ID")
+          setFormData((prevFormData) => ({                                          
+            ...prevFormData,                                                        
+            consigneeId  : formData.customerId,                                                   
+            consigneeName: formData.customerName,                                       
+          }))                             
         })
-    } else if (formData.consigneeId === "") {
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        consigneeName: "",
-      }))
+    } else {
+        setFormData((prevFormData) => ({
+          ...prevFormData,
+          consigneeId  : formData.customerId, 
+          consigneeName: formData.customerName,
+        }))
     }
   }, [formData.consigneeId])
 
