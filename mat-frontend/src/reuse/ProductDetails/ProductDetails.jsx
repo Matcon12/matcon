@@ -57,7 +57,8 @@ export default function ProductDetails({
   }
 
   const debouncedProdId = useDebounce(formData[index].prodId, 100)
-
+  const [qtyUom, setQtyUom] = useState(null); // For deriving the PkSz and UoM
+  
   const [popup, setPopup] = useState(false)
   const [kitQuantity, setKitQuantity] = useState("")
 
@@ -80,6 +81,25 @@ export default function ProductDetails({
     )
   }
 
+  function parsePackSize(pk_Sz) {    
+    //const regex = /^(\d+|\d*\.\d+)\s*(\w+)$/
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
+  
+    const match = pk_Sz.match(regex)
+  
+    console.log("Match:",match)
+    if (match) {
+      console.log("PkSz:",match[1],"UoM:",match[2])
+      return {
+        qty: parseFloat(match[1]),
+        u_o_m: match[2],
+      }
+    } else {
+      throw new Error("Invalid pack size format")
+      return
+    }
+  }
+
   useEffect(() => {
     if (!debouncedProdId) return
     api
@@ -89,6 +109,10 @@ export default function ProductDetails({
         },
       })
       .then((response) => {
+        const parsedPkSz = parsePackSize(response.data.pack_size);
+        console.log("Pack:", parsedPkSz.qty, "UoM:", parsedPkSz.u_o_m);
+        setQtyUom(parsedPkSz); // Store in state
+
         setFormData(
           formData.map((productDetail, idx) => {
             if (idx === index) {
@@ -96,6 +120,7 @@ export default function ProductDetails({
                 ...productDetail,
                 packSize: response.data.pack_size,
                 productDesc: response.data.prod_desc,
+                uom : parsedPkSz.u_o_m
               }
             }
             return productDetail
@@ -109,6 +134,78 @@ export default function ProductDetails({
       setPopup(true)
     }
   }, [debouncedProdId])
+
+  const handleQtyChange = (e) => {
+    const { name, value } = e.target
+    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+
+    // Ensure that value is a valid, positive integer
+    const qnty = parseFloat(value);
+    if (isNaN(qnty) || qnty <= 0) {
+      toast.error("Quantity must be a positive number");
+      e.target.focus();
+      return;
+    }
+    // Validate quantity against pack size
+    if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
+      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
+      e.target.focus();
+      return;
+    }
+  }
+
+  const handlePkszChange = (idx,e) => {
+    const {name, value} = e.target
+    if (formData[index].prodId.startsWith("KIT")) {
+      try {
+        const pkUom = parsePackSize(formData[index].packSize);
+        console.log("Pk:", pkUom.qty, "UoM:", pkUom.u_o_m);
+        setQtyUom(pkUom); // Store in state                          
+        setFormData(                                             
+          formData.map((productDetail, index) => {               
+            if (idx === index) {                                 
+              return {                                           
+                ...productDetail,                                
+                packSize: pkUom?.qty + " " + pkUom?.u_o_m,     
+                uom: pkUom?.u_o_m,                              
+              }                                                  
+            }                                                    
+            return productDetail                                 
+          })                                                     
+        )                                                      
+      } catch (error) {
+        console.error("Error parsing pack size:", error.message);
+        toast.error("Invalid Pack Size format");
+        setFormData(                                             
+          formData.map((productDetail, index) => {               
+            if (idx === index) {                                 
+              return {                                           
+                ...productDetail,                                
+                packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,     
+                uom: qtyUom?.u_o_m,                              
+              }                                                  
+            }                                                    
+            return productDetail                                 
+          })                                                     
+        )                                                      
+      }
+    } else {
+        console.log("PackSize can be changed only for KIT"); 
+        toast.error("PackSize can be changed only for KIT");
+        setFormData(
+          formData.map((productDetail, index) => {
+            if (idx === index) {
+              return {
+                ...productDetail,
+                packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,
+                uom: qtyUom?.u_o_m,
+              }
+            }
+            return productDetail
+          })
+        )
+    }
+  }
 
   const handlePopupChange = (e) => {
     const { name, value } = e.target
@@ -214,7 +311,9 @@ export default function ProductDetails({
               name="packSize"
               value={formData[index].packSize}
               onChange={(e) => handleChange(index, e)}
+              onBlur={(e) => handlePkszChange(index, e)}
               placeholder=" "
+              //readOnly
             />
             <label alt="Enter the Pack Size" placeholder="Pack Size"></label>
           </div>
@@ -250,6 +349,7 @@ export default function ProductDetails({
               name="quantity"
               value={formData[index].quantity}
               onChange={(e) => handleChange(index, e)}
+              onBlur={(e) => handleQtyChange(e)}
               placeholder=" "
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
@@ -301,21 +401,31 @@ export default function ProductDetails({
               ></label>
             </div>
           ) : null}
-          <div className="input-container">
+          {/*<div className="input-container">
             <select
               name="uom"
               value={formData[index].uom}
-              //onChange={(e) => handleChange(index, e)}
+              onChange={(e) => handleChange(index, e)}
             >
-              {/*<option value="" disabled>
+              <option value="" disabled>
                 Select an option
-              </option>*/}
+              </option>
               <option value="Ltr">Ltr</option>
               <option value="Kg">Kg</option>
               <option value="No.">No.</option>
             </select>
             <label alt="Select an Option" placeholder="UOM"></label>
+          </div>*/}
+          <div>
+            <input
+              type="text"
+              name="uom"
+              value={formData[index].uom}
+              placeholder=" "
+            />
+            <label alt="Enter the UoM" placeholder="UOM"></label>
           </div>
+          
           {checkKit ? (
             <div className="deliveryDate">
               <div className="datePickerContainer">

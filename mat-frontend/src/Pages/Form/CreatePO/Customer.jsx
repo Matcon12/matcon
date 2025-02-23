@@ -39,9 +39,6 @@ export default function Customer() {
     })
   }, [])
 
-  // console.log("customer id: ", customerData)
-  // console.log("consignee id: ", consigneeData)
-
   const initialFormData = {
     customerId: "",
     customerName: "",
@@ -79,65 +76,13 @@ export default function Customer() {
     }));
   };
 
-  // Using regular expression to split quantity and UOM from Pack Size
-
-  function parsePackSize(pk_Sz) {    
-    //const regex = /^(\d+|\d*\.\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i;
-  
-    const match = pk_Sz.match(regex)
-  
-    console.log("Match:",match)
-    if (match) {
-      console.log("PkSz:",match[1],"UoM:",match[2])
-      return {
-        qty: parseFloat(match[1]),
-        u_o_m: match[2],
-      }
-    } else {
-      toast.error("Invalid Pack Size Format")
-      throw new Error("Invalid pack size format")
-      return
-    }
-  }
-
   const handleProductChange = (key, event) => {
     const { name, value } = event.target
-    let qtyUom = null; // Initialize qtyUom outside the block
 
     if (name === "unitPrice") {
-      if (value < 0) {
-        toast.error("Unit Price cannot be negative");
+      if (isNaN(value) || value <= 0) {
+        toast.error("Please enter a valid Unit Rate");
         return;
-      }
-
-      const pksz = productDetails[key]?.packSize;
-      if (!pksz) {
-        toast.error("Please enter a valid Pack Size");
-        return;
-      }
-
-      const qnty = productDetails[key]?.quantity;
-      console.log("Original Pack Size:", pksz, "Quantity:", qnty);
-
-      try {
-        qtyUom = parsePackSize(pksz);
-        console.log("Pack:", qtyUom.qty, "UoM:", qtyUom.u_o_m);
-
-        // Ensure that value is a valid, positive integer
-        const parsedQuantity = parseFloat(qnty);
-        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
-          toast.error("Quantity must be a positive number");
-          return;
-        }
-        // Validate quantity against pack size
-        if (parsedQuantity < qtyUom.qty || parsedQuantity % qtyUom.qty !== 0) {
-          toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
-          return;
-        }
-      } catch (error) {
-        console.error("Error parsing pack size:", error.message);
-        return; // Exit if pack size parsing fails
       }
     }
 
@@ -147,7 +92,6 @@ export default function Customer() {
         if (index === key) {
           return {
             ...productDetail,
-            uom: qtyUom?.u_o_m || productDetail.uom, // Use existing uom if qtyUom is null
             [name]: ["totalPrice", "quantity", "unitPrice"].includes(name)
               ? parseFloat(value)
               : value,
@@ -340,6 +284,7 @@ export default function Customer() {
     }
   }, [formData.consigneeId])
 
+
   return (
     <div className="customer-container">
       <div className="complete-form-container">
@@ -366,23 +311,6 @@ export default function Customer() {
                     required={true}
                   />
                 </div>
-                {/*
-                <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
-                    data={purchaseOrder}
-                    mainData={formData}
-                    setData={setPurchaseOrder}
-                    setMainData={setFormData}
-                    handleChange={handleChange}
-                    filteredData={filteredPurchaseData}
-                    setFilteredData={setFilteredPurchaseData}
-                    name="poNo"
-                    placeholder="Customer PO No."
-                    search_value="pono"
-                    required={true}
-                  />
-                </div>
-                */}
                 <div>
                   <input
                     type="text"

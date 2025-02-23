@@ -318,9 +318,46 @@ export default function UpdatePO() {
     }))
   }
 
+  function parsePackSize(pk_Sz) {    
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
+    const match = pk_Sz.match(regex)
+  
+    console.log("Match:",match)
+    if (match) {
+      console.log("PkSz:",match[1],"UoM:",match[2])
+      return {
+        qty: parseFloat(match[1]),
+        u_o_m: match[2],
+      }
+    } else {
+      throw new Error("Invalid pack size format")
+      return
+    }
+  }
+
+  const handleQtyChange = (e) => {
+    const { name, value } = e.target
+    const qtyUom = parsePackSize(searchData.pack_size);
+    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+
+    // Ensure that value is a valid, positive integer
+    const qnty = parseFloat(value);
+    if (isNaN(qnty) || qnty <= 0) {
+      toast.error("Quantity must be a positive number");
+      e.target.focus();
+      return;
+    }
+    // Validate quantity against pack size
+    if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
+      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
+      e.target.focus();
+      return;
+    }
+  }
+
   useEffect(() => {
     const balance = searchData.quantity - searchData.qty_sent
-    const total = parseFloat(
+    const total   = parseFloat(
       searchData.quantity * searchData.unit_price
     ).toFixed(2)
 
@@ -330,58 +367,7 @@ export default function UpdatePO() {
       total_price: total,
     }))
   }, [searchData.qty_sent, searchData.quantity, searchData.unit_price])
-
-  function parsePackSize(packSize) {
-    // Use a regular expression to match the quantity and UOM
-    // const regex = /^(\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i
-    const match = packSize.match(regex)
-
-    if (match) {
-      return {
-        quantity: parseFloat(match[1]),
-        uom: match[2],
-      }
-    } else {
-      //toast.error("Invalid Pack Size Format")
-      throw new Error("Invalid pack size format")
-      return
-    }
-  }
-  {
-    /*
-  useEffect(() => {
-    //  if (!isInitialLoad && searchData.prod_code) {
-    if (searchData.prod_code) {
-      api
-        .get("/packSize", {
-          params: {
-            prodId: searchData.prod_code,
-          },
-        })
-        .then((response) => {
-          console.log("Response Data:", response.data)
-          try {
-            const { uom } = parsePackSize(response.data.pack_size)
-            console.log("PkSz:", response.data.pack_size)
-            console.log("UoM:", uom)
-            setSearchData((prevData) => ({
-              ...prevData,
-              pack_size: response.data.pack_size,
-              // prod_desc: response.data.prod_desc,
-              uom: uom,
-            }))
-          } catch (error) {
-            console.error("Inside:", error.message)
-          }
-        })
-        .catch((error) => {
-          console.log("Outside:", error.response.data.error)
-        })
-    }
-  }, [searchData.prod_code])
-*/
-  }
+  
   return (
     <div className="customer-container">
       <div className="complete-form-container">
@@ -413,7 +399,7 @@ export default function UpdatePO() {
                   // required={true}
                   value={searchData.customer_id}
                   name="customer_id"
-                  // onChange={handleChange}
+                  //onChange={handleChange}
                   placeholder=" "
                   readOnly
                 />
@@ -433,7 +419,7 @@ export default function UpdatePO() {
                   name="po_sl_no"
                   placeholder="PO Sl No."
                   search_value="po_sl_no"
-                  // onchange={handleChange}
+                  //onchange={handleChange}
                 />
               </div>
 
@@ -516,6 +502,7 @@ export default function UpdatePO() {
                     search_value="cust_id"
                   />
                 </div>
+                {/*
                 <div className="autocomplete-wrapper">
                   <AutoCompleteComponent
                     data={suggestions}
@@ -529,6 +516,20 @@ export default function UpdatePO() {
                     search_value="prod_id"
                     readOnly
                   />
+                </div>
+                */}
+                <div>
+                  <input
+                    type="text"
+                    name="prod_code"
+                    value={searchData.prod_code}
+                    placeholder=" "
+                    readOnly
+                  />
+                  <label
+                    alt="Enter the Prod Code"
+                    placeholder="Product Code"
+                  ></label>
                 </div>
                 <div className="specifications-span-2">
                   <textarea
@@ -572,22 +573,13 @@ export default function UpdatePO() {
                   ></label>
                 </div>
                 <div className="input-container">
-                  <select
+                  <input
+                    type="text"
                     name="uom"
                     value={searchData.uom}
-                    //                    onChange={handleChangeData}
-                    readOnly
-                    // required
-                  >
-                    //{" "}
-                    <option value="" disabled>
-                      // Select an option //{" "}
-                    </option>
-                    // <option value="Ltr">Ltr</option>
-                    // <option value="Kg">Kg</option>
-                    // <option value="No.">No.</option>
-                  </select>
-                  <label alt="Select an Option" placeholder="UOM"></label>
+                    placeholder=" "
+                  />
+                  <label alt="Enter the UoM" placeholder="UOM"></label>
                 </div>
                 <div>
                   <input
@@ -596,6 +588,7 @@ export default function UpdatePO() {
                     name="quantity"
                     value={searchData.quantity}
                     onChange={handleChangeData}
+                    onBlur={handleQtyChange}
                     placeholder=" "
                     //                    readOnly
                   />

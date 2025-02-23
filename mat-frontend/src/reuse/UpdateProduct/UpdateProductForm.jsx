@@ -3,6 +3,7 @@ import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteCom
 import api from "../../api/api"
 import KitProducts from "../ProductDetails/KitProducts"
 import "./UpdateProductForm.css"
+import { ToastContainer, toast } from "react-toastify"
 
 export default function UpdateProductForm({
   data,
@@ -28,55 +29,76 @@ export default function UpdateProductForm({
     )
   }
 
-  function parsePackSize(packSize) {
-    // Use a regular expression to match the quantity and UOM
-    const regex = /^(\d+)\s*(\w+)$/
-    const match = packSize.match(regex)
-
+  function parsePackSize(pk_Sz) {    
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
+    const match = pk_Sz.match(regex)
+  
+    console.log("Match:",match)
     if (match) {
+      console.log("PkSz:",match[1],"UoM:",match[2])
       return {
-        quantity: parseInt(match[1], 10),
-        uom: match[2],
+        qty: parseFloat(match[1]),
+        u_o_m: match[2],
       }
     } else {
       throw new Error("Invalid pack size format")
+      return
     }
   }
 
-  console.log("update data: ", data)
+  const handleQtyChange = (e) => {
+    const { name, value } = e.target
+    const qtyUom = parsePackSize(data.pack_size);                             
+    console.log("Pack:", qtyUom?.qty, "UoM:", qtyUom?.u_o_m);            
 
-  useEffect(() => {
-    api
-      .get("/packSize", {
-        params: {
-          prodId: data.prod_code,
-        },
-      })
-      .then((response) => {
-        console.log(response.data)
-        const { uom } = parsePackSize(response.data.pack_size)
-        setKitData((prevData) =>
-          prevData.map((item, idx) =>
-            index === idx
-              ? {
-                  ...item,
-                  prod_code: data.prod_code,
-                  pack_size: response.data.pack_size,
-                  uom: uom,
-                }
-              : item
-          )
-        )
-      })
-      .catch((error) => {
-        console.log(error.response.data.error)
-      })
-  }, [data.prod_code])
+    // Ensure that value is a valid, positive integer
+    const qnty = parseFloat(value);
+    if (isNaN(qnty) || qnty <= 0) {
+      toast.error("Quantity must be a positive number");
+      e.target.focus();
+      return;
+    }
+    // Validate quantity against pack size
+    if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
+      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
+      e.target.focus();
+      return;
+    }
+  }
+
+  //useEffect(() => {
+  //  api
+  //    .get("/packSize", {
+  //      params: {
+  //        prodId: data.prod_code,
+  //      },
+  //    })
+  //    .then((response) => {
+  //      console.log(response.data)
+  //      const { uom } = parsePackSize(response.data.pack_size)
+  //      setKitData((prevData) =>
+  //        prevData.map((item, idx) =>
+  //          index === idx
+  //            ? {
+  //                ...item,
+  //                prod_code: data.prod_code,
+  //                pack_size: response.data.pack_size,
+  //                uom: uom,
+  //              }
+  //            : item
+  //        )
+  //      )
+  //    })
+  //    .catch((error) => {
+  //      console.log(error.response.data.error)
+  //    })
+  //}, [data.prod_code])
 
   useEffect(() => {
     setKitData((prevData) => {
       return prevData?.map((item) => {
         if (data.po_sl_no === item.po_sl_no) {
+          console.log("poslno:",data.po_sl_no);
           return {
             ...item,
             qty_balance: data.quantity - data.qty_sent,
@@ -101,7 +123,7 @@ export default function UpdateProductForm({
             placeholder=" "
           />
           <label alt="Enter the PO Sl No." placeholder="PO Sl No."></label>
-        </div>
+        </div> {/*
         <div className="autocomplete-wrapper">
           <AutoCompleteComponent
             data={suggestions}
@@ -116,6 +138,19 @@ export default function UpdateProductForm({
             index={index}
             // nested={true}
           />
+        </div>*/}
+        <div>
+          <input
+            type="text"
+            name="prod_code"
+            value={data.prod_code}
+            placeholder=" "
+            readOnly
+          />
+          <label
+            alt="Enter the Prod Code"
+            placeholder="Product Code"
+          ></label>
         </div>
 
         <div className="specifications-span-2">
@@ -156,19 +191,12 @@ export default function UpdateProductForm({
           <label alt="Enter the Pack Size" placeholder="Pack Size"></label>
         </div>
         <div className="input-container">
-          <select
+          <input
+            type="text"
             name="uom"
             value={data.uom}
-            onChange={handleChange}
-            // required
-          >
-            <option value="" disabled>
-              Select an option
-            </option>
-            <option value="Ltr">Ltr</option>
-            <option value="Kg">Kg</option>
-            <option value="No.">No.</option>
-          </select>
+            placeholder=" "
+          />
           <label alt="Select an Option" placeholder="UOM"></label>
         </div>
         <div>
@@ -178,6 +206,7 @@ export default function UpdateProductForm({
             name="quantity"
             value={data.quantity}
             onChange={handleChange}
+            onBlur={handleQtyChange}
             placeholder=" "
           />
           <label alt="Enter the Quantity" placeholder="Quantity"></label>
