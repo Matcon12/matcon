@@ -54,6 +54,40 @@ h3 {
 } */
 
 @media print {
+  @page:first {
+      margin-top: 5cm;
+      margin-bottom: 1cm;
+      margin-left: 2cm;
+      margin-right: 1cm;
+  }
+
+  @page {
+      margin: 1cm; /* Default margins for other pages */
+      margin-left: 2cm;
+      @top-center {
+          content: "";
+      }
+      @bottom-center {
+          content: "";
+      }
+      @bottom-left {
+          content: "";
+      }
+      @bottom-right {
+          content: "Page " counter(page) " of " counter(pages);
+      }
+  }
+                                                                                         
+  body,                                                                                      
+  .invoice-report-container,                                                                 
+  .invoice-container {                                                                       
+    background-color: transparent;                                                           
+    color: black;                                                                            
+  }               
+}
+
+/*
+@media print {
   @page {
     size: a4;
   }
@@ -97,3 +131,4 @@ h3 {
     width: 100%;
   }
 }
+*/

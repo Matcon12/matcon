@@ -92,14 +92,14 @@ export default function InvoicePrint() {
       <div ref={ref} className="invoice-container-container">
         <Invoice formData={responseData} rates={rates} />
         <div className="print-footer">
-          Page{" "}
+          {/*Page{" "} */}
           <span
             className="pageNumber"
             ref={(el) => {
               if (el) pageRefs.current.push(el) // Add new refs dynamically
             }}
           ></span>{" "}
-          of <span className="totalPages">{totalPages}</span>
+          {/*of <span className="totalPages">{totalPages}</span> */}
         </div>
       </div>
     )
