@@ -771,11 +771,12 @@ def invoice_processing(request):
         qty_balance = row['qty_balance']
         quantity = row['quantity']
 
-        if qty_tobe_del is not None and qty_balance is not None and quantity is not None:
+    #   if qty_tobe_del is not None and qty_balance is not None and quantity is not None:
+        if (qty_tobe_del > 0):
             if (float(qty_tobe_del) > float(qty_balance)) or (float(qty_tobe_del) > float(quantity)):
                 return JsonResponse({"error": "Insufficient Quantity"}, status=400)
         else:
-            return JsonResponse({"error": "Quantity information missing"}, status=400)
+            return JsonResponse({"error": "Invalid Quantity"}, status=400)
 
     state_code = CustomerMaster.objects.filter(cust_id=cust_id).values_list('cust_st_code', flat=True).first()
     
