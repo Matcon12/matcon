@@ -1189,7 +1189,7 @@ def invoice_report(request):
                                    .exclude(taxable_amt=0)\
                                    .exclude(po_sl_no__regex=r'\.')\
                                    .select_related('cust_id')\
-                                   .values('gcn_no', 'gcn_date', 'po_sl_no', 'qty_delivered',
+                                   .values('cust_id','gcn_no', 'gcn_date', 'po_sl_no', 'qty_delivered',
                                            'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
                                            'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
                                    .order_by('gcn_date')
@@ -1205,13 +1205,14 @@ def invoice_report(request):
             df.drop(columns = ['po_sl_no'],inplace=True)
 
             # Reformat DataFrame
-            df = df[['cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
+            df = df[['cust_id','cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
                      'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
             df.insert(0, 'Sl No', range(1, len(df) + 1))
 
             # Reformat the 'gcn_date' into a readable string format
             df['gcn_date'] = pd.to_datetime(df['gcn_date']).dt.strftime('%d-%m-%Y')
             df = df.rename(columns={
+                'cust_id': 'Cust-ID',
                 'gcn_no': 'Invoice Number',
                 'gcn_date': 'Invoice Date',
                 'hsn_sac': 'HSN/SAC',
@@ -1244,8 +1245,8 @@ def invoice_report(request):
                 'IGST Price (18%)': 'sum'
             }).reset_index()
 
-            df1 = df[['Invoice Number', 'Customer Name', 'Customer GST IN', 'HSN/SAC']].drop_duplicates()
-            df2 = df[['Invoice Number', 'Customer Name', 'Customer GST IN']].drop_duplicates()
+            df1 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'HSN/SAC']].drop_duplicates()
+            df2 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN']].drop_duplicates()
 
             df1['Customer GST IN'] = df1['Customer GST IN'].fillna('')
             df2['Customer GST IN'] = df2['Customer GST IN'].fillna('')
@@ -1271,6 +1272,7 @@ def invoice_report(request):
 
             total_row = pd.DataFrame({
                 'Sl No': 'Total',
+                'Cust_ID': '',
                 'Customer Name': '',
                 'Customer GST IN': '',
                 'Invoice Date': '',
@@ -1286,6 +1288,7 @@ def invoice_report(request):
 
             total_row2 = pd.DataFrame({
                 'Sl No': 'Total',
+                'Cust-ID': '',
                 'Customer Name': '',
                 'Customer GST IN': '',
                 'Invoice Date': '',
@@ -1336,7 +1339,7 @@ def invoice_report(request):
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
             combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
 
-            column_order = ['Sl No', 'Customer Name', 'Customer GST IN', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
+            column_order = ['Sl No', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
             combined_df = combined_df[column_order]
             combined_df2 = combined_df2[column_order]
 

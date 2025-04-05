@@ -226,7 +226,7 @@ export default function InvoiceReportInput() {
           }
         }
 
-        XLSX.writeFile(wb, "Outstanding_PO.xlsx")
+        XLSX.writeFile(wb, "Invoice_Report.xlsx")
       } catch (error) {
         console.error("Error downloading Excel file", error)
       }
