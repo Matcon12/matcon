@@ -554,6 +554,7 @@ def invoice_processing(request):
     contact_nums = CustomerMaster.objects.filter(cust_id=cust_id).values().first()
     print(contact_nums)
     gst_exemption = contact_nums['gst_exemption']
+    print("gst_exemption: ", gst_exemption)
     if not contact_nums:
         return JsonResponse({"error": "Customer not found"}, status=404)
     contact = contact_nums['contact_phone_1'] if contact_nums['contact_name_1'] == contact_name else contact_nums['contact_phone_2']
@@ -590,7 +591,6 @@ def invoice_processing(request):
     #     }
     # }
     data_inw = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=po_sl_numbers)
-    # print(data_inw.query)
     # data_inw = CustomerPurchaseOrder.objects.filter(pono=po_no)
 
     data_dict_inw = list(data_inw.values())
@@ -732,12 +732,13 @@ def invoice_processing(request):
 
     fin_year = int(get_object_or_404(GstRates, id=1).fin_year)
 
+    print(fin_year, current_yyyy, current_mm)
+
     if fin_year < current_yyyy and current_mm > 3:
         fin_year = current_yyyy
-        GstRates.objects.filter(id=1).update(fin_yr=fin_year, last_gcn_no=0)
+        GstRates.objects.filter(id=1).update(fin_year=fin_year, last_gcn_no=0)
     f_year = fin_year + 1
     fyear = str(f_year)[2:]
-
 
     gcn_no = get_object_or_404(GstRates, id=1).last_gcn_no
     new_gcn_no = gcn_no + 1
