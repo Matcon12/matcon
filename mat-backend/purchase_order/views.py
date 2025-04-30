@@ -926,41 +926,33 @@ def invoice_processing(request):
 @csrf_exempt
 def invoice_generation(request):
     if request.method == "GET":
-        gcn_no = request.GET.get("gcn_no")
-        if not gcn_no:
-            return JsonResponse({"error": "GCN number is required"}, status=400)
-        
-        # Derive the complete gcn_no for this invoice
-        gst_rate = get_object_or_404(GstRates, id=1)
-        fin_year = int(gst_rate.fin_year)
-        f_year = fin_year + 1
-        fyear = str(f_year)[2:]
-        # gcn_no = gst_rate.last_gcn_no
-        print("gcn_no: ", gcn_no)
-        gcn_num = f"{str(gcn_no).zfill(3)}/{fin_year}-{fyear}"
+        gcn_no = request.GET.get("gcn_no")  # renamed for clarity
+        year = request.GET.get("year")      # expected format: 2024-25
 
-        print("gcn_num: ", gcn_num)
-        # Get data from otw_dc table
+        if not gcn_no or not year:
+            return JsonResponse({"error": "Both gcn_no and year are required"}, status=400)
+
+        # Format the gcn_no like 001/2024-25
+        gcn_num = f"{str(gcn_no).zfill(3)}/{year}"
+        print("Formatted gcn_num:", gcn_num)
+
         otwdc_values = OtwDc.objects.filter(gcn_no=gcn_num)
-        # print("otwdc_values: ", otwdc_values.values())
         if not otwdc_values.exists():
             return JsonResponse({"error": "No records found for the provided GCN number"}, status=404)
 
         def model_to_dic(instance):
-            print(instance.__dict__['batch_quantity'], "\n")
             return {
                 'sl_no': instance.sl_no,
                 'gcn_no': instance.gcn_no,
-                'gcn_date': str(instance.gcn_date),  # Convert date to string
+                'gcn_date': str(instance.gcn_date),
                 'po_no': instance.po_no,
-                'po_date': str(instance.po_date),  # Convert date to string
+                'po_date': str(instance.po_date),
                 'cust_id': instance.cust_id,
                 'consignee_id': instance.consignee_id,
                 'prod_id': instance.prod_id,
                 'po_sl_no': instance.po_sl_no,
                 'prod_desc': instance.prod_desc,
                 'additional_desc': instance.additional_desc,
-                # 'omat': instance.omat,
                 'hsn': instance.hsn_sac,
                 'batch': instance.batch,
                 'coc': instance.coc,
@@ -971,50 +963,39 @@ def invoice_generation(request):
                 'cgst_price': instance.cgst_price,
                 'sgst_price': instance.sgst_price,
                 'igst_price': instance.igst_price,
-                "contact_name": instance.contact_name,
-                "batch_quantity": instance.batch_quantity,
-                "coc": instance.coc
+                'contact_name': instance.contact_name,
+                'batch_quantity': instance.batch_quantity
             }
-        
+
         otwdc_result = [model_to_dic(otwdc_value) for otwdc_value in otwdc_values]
 
-        # print("otwdc_result", otwdc_result)
-        
+        # Keep unique po_sl_no entries only
         unique_po_sl_no = {}
         for item in otwdc_result:
             if item['po_sl_no'] not in unique_po_sl_no:
-                unique_po_sl_no[item['po_sl_no']]= item
-
-        # print("entered")
+                unique_po_sl_no[item['po_sl_no']] = item
 
         inv_result = list(unique_po_sl_no.values())
         odc1 = otwdc_values.first()
-        # return JsonResponse({"inv_result": inv_result})
 
-        print("odc1: ", odc1.__dict__)
-
+        # Filter out unwanted po_sl_no
         unwanted_po_sl_no = ("fr", "ins", "oc")
         final_otwdc = [otwdc for otwdc in otwdc_result if otwdc['po_sl_no'] not in unwanted_po_sl_no]
-        r = get_object_or_404(CustomerMaster, cust_id=odc1.cust_id)
-        print("entered")
-        c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
 
-        print('entered')
-        print("otwdc_values: ", otwdc_values)
-        
+        r = get_object_or_404(CustomerMaster, cust_id=odc1.cust_id)
+        c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
+        gst_rate = get_object_or_404(GstRates, id=1)
+
         total_qty = otwdc_values.aggregate(total_qty=Sum('qty_delivered'))['total_qty'] or 0
-        # total_taxable_value = inv_result.aggregate(total_taxable_value=Sum('taxable_amt'))['total_taxable_value'] or 0
         total_taxable_value = sum(item['taxable_amt'] for item in inv_result)
         total_cgst = sum(item['cgst_price'] for item in inv_result)
         total_sgst = sum(item['sgst_price'] for item in inv_result)
         total_igst = sum(item['igst_price'] for item in inv_result)
-        # total_cgst = otwdc_values.aggregate(total_cgst=Sum('cgst_price'))['total_cgst'] or 0
-        # total_sgst = otwdc_values.aggregate(total_sgst=Sum('sgst_price'))['total_sgst'] or 0
-        # total_igst = otwdc_values.aggregate(total_igst=Sum('igst_price'))['total_igst'] or 0
 
         grand_total = round(total_taxable_value + total_cgst + total_sgst + total_igst)
         gt = format_currency(grand_total, 'INR', locale='en_IN')
         aw = convert_rupees_to_words(grand_total)
+
         context = {
             'inv': inv_result,
             'odc': final_otwdc,
@@ -1030,7 +1011,7 @@ def invoice_generation(request):
             'gt': gt,
             'total_qty': total_qty
         }
-        return JsonResponse({"message": "success","inv_result": inv_result, "context": context}, safe=False)
+        return JsonResponse({"message": "success", "inv_result": inv_result, "context": context}, safe=False)
     else:
         return JsonResponse({"error": "Only GET requests are allowed"}, status=405)
     

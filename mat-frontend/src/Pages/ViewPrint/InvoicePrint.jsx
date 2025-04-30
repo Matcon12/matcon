@@ -111,6 +111,7 @@ export default function InvoicePrint() {
       .get("/invoiceGeneration", {
         params: {
           gcn_no: formData.invoiceNumber,
+          year: formData.year,
         },
       })
       .then((response) => {
