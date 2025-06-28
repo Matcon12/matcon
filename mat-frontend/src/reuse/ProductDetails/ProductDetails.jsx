@@ -147,7 +147,9 @@ export default function ProductDetails({
       return;
     }
     // Validate quantity against pack size
-    if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
+    // if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
+    // If qnty is a fraction, this check fails, hence * 1000
+    if (qnty < qtyUom.qty || ((qnty * 1000) % (qtyUom.qty * 1000)) !== 0) {
       toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
       e.target.focus();
       return;
