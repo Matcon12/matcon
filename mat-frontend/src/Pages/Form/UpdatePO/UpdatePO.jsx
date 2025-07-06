@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { DatePicker, Space } from "antd"
 import dayjs from "dayjs"
 // import possibleValues from "../../../../data.js"
-import AutoCompleteComponent from "../../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../../reuse/ui/AutoCompleteUtil.jsx"
 import { format, addYears, parse, isAfter } from "date-fns"
 import { ToastContainer, toast } from "react-toastify"
 
@@ -252,7 +252,8 @@ export default function UpdatePO() {
 
   const handleUpdate = (e) => {
     e.preventDefault()
-    console.log("update data: ", searchData)
+    console.log("searchInputs: ", searchInputs)
+    console.log("searchData: ", searchData)
     console.log("kit data: ", kitData)
     api
       .put("/updateForm", { searchInputs, searchData, kitData })
@@ -318,13 +319,13 @@ export default function UpdatePO() {
     }))
   }
 
-  function parsePackSize(pk_Sz) {    
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
+  function parsePackSize(pk_Sz) {
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
     const match = pk_Sz.match(regex)
-  
-    console.log("Match:",match)
+
+    console.log("Match:", match)
     if (match) {
-      console.log("PkSz:",match[1],"UoM:",match[2])
+      console.log("PkSz:", match[1], "UoM:", match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -337,27 +338,35 @@ export default function UpdatePO() {
 
   const handleQtyChange = (e) => {
     const { name, value } = e.target
-    const qtyUom = parsePackSize(searchData.pack_size);
-    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+    const qtyUom = parsePackSize(searchData.pack_size)
+    console.log(
+      "OnBlur-handleQtyChange",
+      name,
+      value,
+      qtyUom?.qty,
+      qtyUom?.u_o_m
+    )
 
     // Ensure that value is a valid, positive integer
-    const qnty = parseFloat(value);
+    const qnty = parseFloat(value)
     if (isNaN(qnty) || qnty <= 0) {
-      toast.error("Quantity must be a positive number");
-      e.target.focus();
-      return;
+      toast.error("Quantity must be a positive number")
+      e.target.focus()
+      return
     }
     // Validate quantity against pack size
     if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
-      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
-      e.target.focus();
-      return;
+      toast.error(
+        `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
+      )
+      e.target.focus()
+      return
     }
   }
 
   useEffect(() => {
     const balance = searchData.quantity - searchData.qty_sent
-    const total   = parseFloat(
+    const total = parseFloat(
       searchData.quantity * searchData.unit_price
     ).toFixed(2)
 
@@ -367,7 +376,7 @@ export default function UpdatePO() {
       total_price: total,
     }))
   }, [searchData.qty_sent, searchData.quantity, searchData.unit_price])
-  
+
   return (
     <div className="customer-container">
       <div className="complete-form-container">
@@ -380,7 +389,7 @@ export default function UpdatePO() {
           <form onSubmit={handleSubmit} autoComplete="off">
             <div className="only-input-styles">
               <div className="autocomplete-wrapper">
-                <AutoCompleteComponent
+                <AutoCompleteUtil
                   data={purchaseOrder}
                   mainData={searchData}
                   setData={setPurchaseOrder}
@@ -409,7 +418,7 @@ export default function UpdatePO() {
                 ></label>
               </div>
               <div className="autocomplete-wrapper">
-                <AutoCompleteComponent
+                <AutoCompleteUtil
                   data={poslnos}
                   mainData={searchData}
                   setData={setPoslnos}
@@ -490,7 +499,7 @@ export default function UpdatePO() {
                   ></label>
                 </div>
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={consigneeData}
                     mainData={searchData}
                     setData={setConsigneeData}
@@ -504,7 +513,7 @@ export default function UpdatePO() {
                 </div>
                 {/*
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={suggestions}
                     setData={setSuggestions}
                     mainData={searchData}

@@ -2,7 +2,7 @@ import { Space, DatePicker } from "antd"
 import dayjs from "dayjs"
 import api from "../../api/api.jsx"
 import { useState, useEffect } from "react"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../reuse/ui/AutoCompleteUtil.jsx"
 import * as XLSX from "xlsx"
 import { ToastContainer, toast } from "react-toastify"
 import "./OutstandingPO.css"
@@ -272,7 +272,7 @@ export default function OutstandingPO() {
               </div>
             </div>
             <div className="autocomplete-wrapper">
-              <AutoCompleteComponent
+              <AutoCompleteUtil
                 data={customerData}
                 mainData={formData}
                 setData={setCustomerData}

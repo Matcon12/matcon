@@ -2,7 +2,7 @@ import "./CustomerDetails.css"
 import { Link } from "react-router-dom"
 import { useState, useEffect } from "react"
 import api from "../../api/api.jsx"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../reuse/ui/AutoCompleteUtil.jsx"
 import { ToastContainer, toast } from "react-toastify"
 
 import "react-toastify/dist/ReactToastify.css"
@@ -61,7 +61,7 @@ export default function AddCustomerDetails() {
     const { name, value } = event.target
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: name === "Cust_ID" ? value.trim() :  value,
+      [name]: name === "Cust_ID" ? value.trim() : value,
     }))
 
     if (name === "Cust_St_Name") {
@@ -212,7 +212,7 @@ export default function AddCustomerDetails() {
               <label alt="Enter the Address 2" placeholder="Address 2"></label>
             </div>
             <div className="autocomplete-wrapper">
-              <AutoCompleteComponent
+              <AutoCompleteUtil
                 data={stateData}
                 mainData={formData}
                 setData={setStateData}

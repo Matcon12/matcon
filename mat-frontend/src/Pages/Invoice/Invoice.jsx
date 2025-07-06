@@ -3,7 +3,7 @@ import "./Invoice.css"
 import "../Form/CreatePO/Customer.css"
 import { useNavigate } from "react-router-dom"
 import api from "../../api/api.jsx"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../reuse/ui/AutoCompleteUtil.jsx"
 import { ToastContainer, toast } from "react-toastify"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {
@@ -235,7 +235,7 @@ export default function Invoice() {
       <form onSubmit={handleSubmit} autoComplete="off">
         <div className="invoice-input-container">
           <div className="autocomplete-wrapper autocomplete-wrapper-invoice">
-            <AutoCompleteComponent
+            <AutoCompleteUtil
               data={purchaseOrder}
               mainData={formData}
               setData={setPurchaseOrder}
@@ -274,7 +274,7 @@ export default function Invoice() {
             ></label>
           </div>
           <div className="autocomplete-wrapper autocomplete-wrapper-invoice">
-            <AutoCompleteComponent
+            <AutoCompleteUtil
               data={customerData}
               mainData={formData}
               setData={setCustomerData}
@@ -400,7 +400,7 @@ export default function Invoice() {
                     <div className="invoice-form-input-container">
                       <div className="invoice-form-input-only-headers">
                         <div className="autocomplete-wrapper">
-                          <AutoCompleteComponent
+                          <AutoCompleteUtil
                             data={purchaseOrderDetails}
                             mainData={entries}
                             setData={setPurchaseOrderDetails}

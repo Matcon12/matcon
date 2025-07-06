@@ -6,7 +6,7 @@ import dayjs from "dayjs"
 import ProductDetails from "../../../reuse/ProductDetails/ProductDetails.jsx"
 import { Link } from "react-router-dom"
 import api from "../../../api/api.jsx"
-import AutoCompleteComponent from "../../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../../reuse/ui/AutoCompleteUtil.jsx"
 import { format, addYears, parse } from "date-fns"
 import { ToastContainer, toast } from "react-toastify"
 
@@ -48,6 +48,7 @@ export default function Customer() {
     quoteId: "",
     consigneeId: "",
     consigneeName: "",
+    location: "",
   }
 
   const initialProductDetails = {
@@ -73,16 +74,16 @@ export default function Customer() {
     setFormData((prevFormData) => ({
       ...prevFormData,
       [name]: name === "poNo" ? value.trim() : value, //Trimming all spaces
-    }));
-  };
+    }))
+  }
 
   const handleProductChange = (key, event) => {
     const { name, value } = event.target
 
     if (name === "unitPrice") {
       if (isNaN(value) || value <= 0) {
-        toast.error("Please enter a valid Unit Rate");
-        return;
+        toast.error("Please enter a valid Unit Rate")
+        return
       }
     }
 
@@ -95,17 +96,16 @@ export default function Customer() {
             [name]: ["totalPrice", "quantity", "unitPrice"].includes(name)
               ? parseFloat(value)
               : value,
-          };
+          }
         }
-        return productDetail;
+        return productDetail
       })
-    );
-  };
+    )
+  }
   // ------------------------------- End of Changes ------------------------
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    // console.log(productDetails)
     api
       .post("/submitForm", {
         formData: formData,
@@ -209,7 +209,7 @@ export default function Customer() {
 
   useEffect(() => {
     if (!formData.customerId) return
-    console.log("useEffect CustID:",formData.customerId)
+    console.log("useEffect CustID:", formData.customerId)
     api
       .get("/customerName", {
         params: {
@@ -227,7 +227,7 @@ export default function Customer() {
       })
 
       .catch((error) => {
-        toast.error("UNKNOWN ERROR")  
+        toast.error("UNKNOWN ERROR")
         console.log(error.data.error)
       })
   }, [formData.customerId])
@@ -263,27 +263,26 @@ export default function Customer() {
           consNM = response.data.customer_name
           setFormData((prevFormData) => ({
             ...prevFormData,
-            consigneeId  : consNM ? consID : formData.customerId,
+            consigneeId: consNM ? consID : formData.customerId,
             consigneeName: consNM ? consNM : formData.customerName,
           }))
         })
         .catch((error) => {
           console.log("Invalid consigneeID. Making cust-ID as Cons-ID")
-          setFormData((prevFormData) => ({                                          
-            ...prevFormData,                                                        
-            consigneeId  : formData.customerId,                                                   
-            consigneeName: formData.customerName,                                       
-          }))                             
+          setFormData((prevFormData) => ({
+            ...prevFormData,
+            consigneeId: formData.customerId,
+            consigneeName: formData.customerName,
+          }))
         })
     } else {
-        setFormData((prevFormData) => ({
-          ...prevFormData,
-          consigneeId  : formData.customerId, 
-          consigneeName: formData.customerName,
-        }))
+      setFormData((prevFormData) => ({
+        ...prevFormData,
+        consigneeId: formData.customerId,
+        consigneeName: formData.customerName,
+      }))
     }
   }, [formData.consigneeId])
-
 
   return (
     <div className="customer-container">
@@ -297,7 +296,7 @@ export default function Customer() {
             <div className="form-input-and-button-container">
               <div className="only-input-styles">
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={customerData}
                     mainData={formData}
                     setData={setCustomerData}
@@ -381,7 +380,7 @@ export default function Customer() {
                   ></label>
                 </div>
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={consigneeData}
                     mainData={formData}
                     setData={setConsigneeData}
@@ -421,6 +420,18 @@ export default function Customer() {
                     alt="Enter the Consignee Name"
                     placeholder="Consignee Name"
                   ></label>
+                </div>
+                <div>
+                  <select
+                    name="location"
+                    value={formData.location || "HBL"}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="HBL">Hebbal (HBL)</option>
+                    <option value="ASP">Aerospace Park (ASP)</option>
+                  </select>
+                  <label alt="Select Location" placeholder="Location"></label>
                 </div>
               </div>
               {/* {console.log("product details: ", productDetails)} */}

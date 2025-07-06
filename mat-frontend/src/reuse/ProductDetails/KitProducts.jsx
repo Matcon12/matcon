@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { DatePicker, Space } from "antd"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent"
+import AutoCompleteUtil from "../ui/AutoCompleteUtil.jsx"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {
   faTrash,
@@ -127,7 +127,7 @@ export default function KitProducts({
           </div>
           {console.log("main data: ", formData)}
           <div className="autocomplete-wrapper">
-            <AutoCompleteComponent
+            <AutoCompleteUtil
               data={suggestions}
               mainData={formData}
               setMainData={setFormData}

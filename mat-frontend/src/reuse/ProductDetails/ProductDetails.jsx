@@ -8,7 +8,7 @@ import {
   faPlus,
 } from "@fortawesome/free-solid-svg-icons"
 import "./ProductDetails.css"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent"
+import AutoCompleteUtil from "../ui/AutoCompleteUtil.jsx"
 import api from "../../api/api.jsx"
 import useDebounce from "../../hooks/useDebounce.jsx"
 import KitProducts from "./KitProducts.jsx"
@@ -57,8 +57,8 @@ export default function ProductDetails({
   }
 
   const debouncedProdId = useDebounce(formData[index].prodId, 100)
-  const [qtyUom, setQtyUom] = useState(null); // For deriving the PkSz and UoM
-  
+  const [qtyUom, setQtyUom] = useState(null) // For deriving the PkSz and UoM
+
   const [popup, setPopup] = useState(false)
   const [kitQuantity, setKitQuantity] = useState("")
 
@@ -81,15 +81,15 @@ export default function ProductDetails({
     )
   }
 
-  function parsePackSize(pk_Sz) {    
+  function parsePackSize(pk_Sz) {
     //const regex = /^(\d+|\d*\.\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
-  
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
+
     const match = pk_Sz.match(regex)
-  
-    console.log("Match:",match)
+
+    console.log("Match:", match)
     if (match) {
-      console.log("PkSz:",match[1],"UoM:",match[2])
+      console.log("PkSz:", match[1], "UoM:", match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -109,9 +109,9 @@ export default function ProductDetails({
         },
       })
       .then((response) => {
-        const parsedPkSz = parsePackSize(response.data.pack_size);
-        console.log("Pack:", parsedPkSz.qty, "UoM:", parsedPkSz.u_o_m);
-        setQtyUom(parsedPkSz); // Store in state
+        const parsedPkSz = parsePackSize(response.data.pack_size)
+        console.log("Pack:", parsedPkSz.qty, "UoM:", parsedPkSz.u_o_m)
+        setQtyUom(parsedPkSz) // Store in state
 
         setFormData(
           formData.map((productDetail, idx) => {
@@ -120,7 +120,7 @@ export default function ProductDetails({
                 ...productDetail,
                 packSize: response.data.pack_size,
                 productDesc: response.data.prod_desc,
-                uom : parsedPkSz.u_o_m
+                uom: parsedPkSz.u_o_m,
               }
             }
             return productDetail
@@ -137,63 +137,55 @@ export default function ProductDetails({
 
   const handleQtyChange = (e) => {
     const { name, value } = e.target
-    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+    console.log(
+      "OnBlur-handleQtyChange",
+      name,
+      value,
+      qtyUom?.qty,
+      qtyUom?.u_o_m
+    )
 
     // Ensure that value is a valid, positive integer
-    const qnty = parseFloat(value);
+    const qnty = parseFloat(value)
     if (isNaN(qnty) || qnty <= 0) {
-      toast.error("Quantity must be a positive number");
-      e.target.focus();
-      return;
+      toast.error("Quantity must be a positive number")
+      e.target.focus()
+      return
     }
     // Validate quantity against pack size
     // if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
     // If qnty is a fraction, this check fails, hence * 1000
-    if (qnty < qtyUom.qty || ((qnty * 1000) % (qtyUom.qty * 1000)) !== 0) {
-      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
-      e.target.focus();
-      return;
+    if (qnty < qtyUom.qty || (qnty * 1000) % (qtyUom.qty * 1000) !== 0) {
+      toast.error(
+        `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
+      )
+      e.target.focus()
+      return
     }
   }
 
-  const handlePkszChange = (idx,e) => {
-    const {name, value} = e.target
+  const handlePkszChange = (idx, e) => {
+    const { name, value } = e.target
     if (formData[index].prodId.startsWith("KIT")) {
       try {
-        const pkUom = parsePackSize(formData[index].packSize);
-        console.log("Pk:", pkUom.qty, "UoM:", pkUom.u_o_m);
-        setQtyUom(pkUom); // Store in state                          
-        setFormData(                                             
-          formData.map((productDetail, index) => {               
-            if (idx === index) {                                 
-              return {                                           
-                ...productDetail,                                
-                packSize: pkUom?.qty + " " + pkUom?.u_o_m,     
-                uom: pkUom?.u_o_m,                              
-              }                                                  
-            }                                                    
-            return productDetail                                 
-          })                                                     
-        )                                                      
+        const pkUom = parsePackSize(formData[index].packSize)
+        console.log("Pk:", pkUom.qty, "UoM:", pkUom.u_o_m)
+        setQtyUom(pkUom) // Store in state
+        setFormData(
+          formData.map((productDetail, index) => {
+            if (idx === index) {
+              return {
+                ...productDetail,
+                packSize: pkUom?.qty + " " + pkUom?.u_o_m,
+                uom: pkUom?.u_o_m,
+              }
+            }
+            return productDetail
+          })
+        )
       } catch (error) {
-        console.error("Error parsing pack size:", error.message);
-        toast.error("Invalid Pack Size format");
-        setFormData(                                             
-          formData.map((productDetail, index) => {               
-            if (idx === index) {                                 
-              return {                                           
-                ...productDetail,                                
-                packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,     
-                uom: qtyUom?.u_o_m,                              
-              }                                                  
-            }                                                    
-            return productDetail                                 
-          })                                                     
-        )                                                      
-      }
-    } else {
-        console.log("PackSize can be changed only for KIT"); 
-        toast.error("PackSize can be changed only for KIT");
+        console.error("Error parsing pack size:", error.message)
+        toast.error("Invalid Pack Size format")
         setFormData(
           formData.map((productDetail, index) => {
             if (idx === index) {
@@ -206,6 +198,22 @@ export default function ProductDetails({
             return productDetail
           })
         )
+      }
+    } else {
+      console.log("PackSize can be changed only for KIT")
+      toast.error("PackSize can be changed only for KIT")
+      setFormData(
+        formData.map((productDetail, index) => {
+          if (idx === index) {
+            return {
+              ...productDetail,
+              packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,
+              uom: qtyUom?.u_o_m,
+            }
+          }
+          return productDetail
+        })
+      )
     }
   }
 
@@ -293,7 +301,7 @@ export default function ProductDetails({
           </div>
           {/* {console.log("main data: ", formData)} */}
           <div className="autocomplete-wrapper">
-            <AutoCompleteComponent
+            <AutoCompleteUtil
               data={suggestions}
               mainData={formData}
               setMainData={setFormData}
@@ -427,7 +435,7 @@ export default function ProductDetails({
             />
             <label alt="Enter the UoM" placeholder="UOM"></label>
           </div>
-          
+
           {checkKit ? (
             <div className="deliveryDate">
               <div className="datePickerContainer">
