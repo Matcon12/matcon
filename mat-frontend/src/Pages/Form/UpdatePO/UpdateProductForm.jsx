@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
-import AutoCompleteUtil from "../ui/AutoCompleteUtil"
-import api from "../../api/api"
-import KitProducts from "../ProductDetails/KitProducts"
+// import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent"
+import api from "../../../api/api"
+// import KitProducts from "../ProductDetails/KitProducts"
 import "./UpdateProductForm.css"
 import { ToastContainer, toast } from "react-toastify"
 
@@ -128,7 +128,7 @@ export default function UpdateProductForm({
         </div>{" "}
         {/*
         <div className="autocomplete-wrapper">
-          <AutoCompleteUtil
+          <AutoCompleteComponent
             data={suggestions}
             mainData={kitData}
             setMainData={setKitData}

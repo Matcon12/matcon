@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-export default function AutoCompleteUtil({
+export default function AutoCompleteComponent({
   data,
   mainData,
   setMainData,

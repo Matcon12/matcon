@@ -11,7 +11,7 @@ import { format, addYears, parse, isAfter } from "date-fns"
 import { ToastContainer, toast } from "react-toastify"
 
 import "react-toastify/dist/ReactToastify.css"
-import UpdateProductForm from "../../../reuse/UpdateProduct/UpdateProductForm.jsx"
+import UpdateProductForm from "./UpdateProductForm.jsx"
 
 export default function UpdatePO() {
   const initialSearchInputs = {
@@ -39,6 +39,7 @@ export default function UpdatePO() {
     delivery_date: null,
     // omat: "",
     hsn_sac: "",
+    location: "",
   }
 
   const [searchInputs, setSearchInputs] = useState(initialSearchInputs)
@@ -138,6 +139,7 @@ export default function UpdatePO() {
               hsn_sac: data.hsn_sac,
               // omat: data.omat,
               uom: data.uom,
+              location: data.location,
             })
             console.log("data: ", data)
             console.log("searchData: ", searchData)
@@ -168,6 +170,7 @@ export default function UpdatePO() {
               delivery_date: "",
               hsn_sac: "",
               // omat: "",
+              location: "",
             }))
             console.log(error.response.data.error)
             toast.error("Error fetching the data")
@@ -215,6 +218,7 @@ export default function UpdatePO() {
               delivery_date: formattedDeliveryDate,
               uom: data.uom,
               hsn_sac: data.hsn_sac,
+              location: data.location,
             })
             toast.success("Successfuly fetched Data!!")
           })
@@ -247,13 +251,13 @@ export default function UpdatePO() {
       delivery_date: null,
       // omat: "",
       hsn_sac: "",
+      location: "",
     })
   }
 
   const handleUpdate = (e) => {
     e.preventDefault()
-    console.log("searchInputs: ", searchInputs)
-    console.log("searchData: ", searchData)
+    console.log("update data: ", searchData)
     console.log("kit data: ", kitData)
     api
       .put("/updateForm", { searchInputs, searchData, kitData })
@@ -539,6 +543,18 @@ export default function UpdatePO() {
                     alt="Enter the Prod Code"
                     placeholder="Product Code"
                   ></label>
+                </div>
+                <div>
+                  <select
+                    name="location"
+                    value={searchData.location}
+                    onChange={handleChangeData}
+                    required
+                  >
+                    <option value="HBL">Hebbal (HBL)</option>
+                    <option value="ASP">Aerospace Park (ASP)</option>
+                  </select>
+                  <label alt="Select Location" placeholder="Location"></label>
                 </div>
                 <div className="specifications-span-2">
                   <textarea
