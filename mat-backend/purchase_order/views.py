@@ -90,6 +90,7 @@ def get_pack_size(request):
                 return JsonResponse({
                   'pack_size': result.pack_size,
                   'prod_desc': result.prod_desc,
+                  'price': result.price,
                 })
             else:
                 return JsonResponse({'error': 'prodId parameter is missing'}, status=400)

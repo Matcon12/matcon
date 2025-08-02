@@ -118,7 +118,10 @@ export default function Customer() {
       })
       .catch((error) => {
         toast.error("ERROR: Invalid/Missing Input Data")
-        console.log(error.response.data.error)
+        console.log(
+          "API Error:",
+          error?.response?.data?.error || error?.message || "Unknown error"
+        )
         return
       })
   }
@@ -168,20 +171,26 @@ export default function Customer() {
   }
 
   const setTotal = (total, index) => {
-    setProductDetails(
-      productDetails.map((productDetail) => {
-        if (productDetails.indexOf(productDetail) == index) {
-          return { ...productDetail, ["totalPrice"]: parseFloat(total) }
-        }
-        return productDetail
-      })
-    )
+    const parsedTotal = parseFloat(total)
+    if (!isNaN(parsedTotal)) {
+      setProductDetails(
+        productDetails.map((productDetail) => {
+          if (productDetails.indexOf(productDetail) == index) {
+            return { ...productDetail, ["totalPrice"]: parsedTotal }
+          }
+          return productDetail
+        })
+      )
+    }
   }
 
   const grandTotal = () => {
     let total = 0.0
     productDetails.forEach((productDetail) => {
-      total += parseFloat(productDetail.totalPrice)
+      const price = parseFloat(productDetail.totalPrice)
+      if (!isNaN(price)) {
+        total += price
+      }
     })
     return parseFloat(total).toFixed(2)
   }
@@ -228,7 +237,10 @@ export default function Customer() {
 
       .catch((error) => {
         toast.error("UNKNOWN ERROR")
-        console.log(error.data.error)
+        console.log(
+          "API Error:",
+          error?.response?.data?.error || error?.message || "Unknown error"
+        )
       })
   }, [formData.customerId])
 
@@ -275,7 +287,10 @@ export default function Customer() {
             consigneeName: formData.customerName,
           }))
         })
-    } else {
+    } else if (
+      formData.consigneeId !== formData.customerId ||
+      formData.consigneeName !== formData.customerName
+    ) {
       setFormData((prevFormData) => ({
         ...prevFormData,
         consigneeId: formData.customerId,

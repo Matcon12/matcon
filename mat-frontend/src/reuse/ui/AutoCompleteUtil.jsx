@@ -48,9 +48,19 @@ export default function AutoCompleteComponent({
   }
 
   const filterSuggestions = (value) => {
-    return data.filter((item) =>
+    console.log(
+      "Filtering suggestions:",
+      data,
+      "Search value:",
+      search_value,
+      "Value:",
+      value
+    )
+    const filtered = data.filter((item) =>
       item[search_value]?.toLowerCase().includes(value.toLowerCase())
     )
+    console.log("Filtered suggestions:", filtered)
+    return filtered
   }
 
   const handleSpecialChange = (name, value) => {
@@ -102,6 +112,19 @@ export default function AutoCompleteComponent({
         return updated
       })
     }
+
+    if (name === "prodId") {
+      console.log("Handling prodId change:", value, "Index:", index)
+      setMainData((prev) => {
+        const updated = [...prev]
+        updated[index] = {
+          ...updated[index],
+          [name]: value,
+        }
+        console.log("Updated mainData:", updated)
+        return updated
+      })
+    }
   }
 
   const handleChange = (e) => {
@@ -109,7 +132,7 @@ export default function AutoCompleteComponent({
     const { name, value } = e.target
 
     if (
-      (name === "poSlNo" || name === "prod_code") &&
+      (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
       array &&
       index !== undefined
     ) {
@@ -127,9 +150,25 @@ export default function AutoCompleteComponent({
 
   const handleSuggestionClick = (suggestion) => {
     const value = suggestion[search_value]
+    console.log(
+      "Suggestion clicked:",
+      suggestion,
+      "Value:",
+      value,
+      "Name:",
+      name,
+      "Search value:",
+      search_value
+    )
 
-    if (array && index !== undefined) {
+    if (
+      (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
+      array &&
+      index !== undefined
+    ) {
       handleSpecialChange(name, value)
+    } else if (array && nested) {
+      updateNestedArrayField(name, value)
     } else {
       updateMainField(name, value)
     }

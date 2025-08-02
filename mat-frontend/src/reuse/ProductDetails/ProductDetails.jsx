@@ -121,6 +121,7 @@ export default function ProductDetails({
                 packSize: response.data.pack_size,
                 productDesc: response.data.prod_desc,
                 uom: parsedPkSz.u_o_m,
+                unitPrice: response.data.price || "",
               }
             }
             return productDetail
@@ -128,7 +129,10 @@ export default function ProductDetails({
         )
       })
       .catch((error) => {
-        console.log(error.response.data.error)
+        console.log(
+          "API Error:",
+          error?.response?.data?.error || error?.message || "Unknown error"
+        )
       })
     if (debouncedProdId.startsWith("KIT")) {
       setPopup(true)
@@ -364,53 +368,44 @@ export default function ProductDetails({
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
           </div>
-          {checkKit ? (
-            <div>
-              <input
-                type="number"
-                name="unitPrice"
-                value={formData[index].unitPrice}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-              />
-              <label
-                alt="Enter the Unit Price"
-                placeholder="Rate per UOM"
-              ></label>
-            </div>
-          ) : null}
+          <div>
+            <input
+              type="number"
+              name="unitPrice"
+              value={formData[index].unitPrice}
+              onChange={(e) => handleChange(index, e)}
+              placeholder=" "
+            />
+            <label
+              alt="Enter the Unit Price"
+              placeholder="Rate per UOM"
+            ></label>
+          </div>
 
-          {checkKit ? (
-            <div>
-              <input
-                type="number"
-                name="totalPrice"
-                value={formData[index].totalPrice}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-                readOnly
-              />
-              <label
-                alt="Enter the Total Price"
-                placeholder="Total Price"
-              ></label>
-            </div>
-          ) : null}
-          {checkKit ? (
-            <div>
-              <input
-                type="text"
-                name="hsn_sac"
-                value={formData[index].hsn_sac}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-              />
-              <label
-                alt="Enter the HSN/SAC"
-                placeholder="HSN/SAC Code:"
-              ></label>
-            </div>
-          ) : null}
+          <div>
+            <input
+              type="number"
+              name="totalPrice"
+              value={formData[index].totalPrice}
+              onChange={(e) => handleChange(index, e)}
+              placeholder=" "
+              readOnly
+            />
+            <label
+              alt="Enter the Total Price"
+              placeholder="Total Price"
+            ></label>
+          </div>
+          <div>
+            <input
+              type="text"
+              name="hsn_sac"
+              value={formData[index].hsn_sac}
+              onChange={(e) => handleChange(index, e)}
+              placeholder=" "
+            />
+            <label alt="Enter the HSN/SAC" placeholder="HSN/SAC Code:"></label>
+          </div>
           {/*<div className="input-container">
             <select
               name="uom"
