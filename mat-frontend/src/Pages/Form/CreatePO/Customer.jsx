@@ -197,24 +197,24 @@ export default function Customer() {
     })
 
     // Submit the form
-    // api
-    //   .post("/submitForm", {
-    //     formData: formData,
-    //     productDetails: validProductDetails,
-    //   })
-    //   .then((response) => {
-    //     console.log(response.data)
-    //     toast.success(`PO No: ${formData.poNo} created successfully`)
-    //     resetForm()
-    //   })
-    //   .catch((error) => {
-    //     toast.error("ERROR: Invalid/Missing Input Data")
-    //     console.log(
-    //       "API Error:",
-    //       error?.response?.data?.error || error?.message || "Unknown error"
-    //     )
-    //     return
-    //   })
+    api
+      .post("/submitForm", {
+        formData: formData,
+        productDetails: validProductDetails,
+      })
+      .then((response) => {
+        console.log(response.data)
+        toast.success(`PO No: ${formData.poNo} created successfully`)
+        resetForm()
+      })
+      .catch((error) => {
+        toast.error("ERROR: Invalid/Missing Input Data")
+        console.log(
+          "API Error:",
+          error?.response?.data?.error || error?.message || "Unknown error"
+        )
+        return
+      })
   }
 
   const resetForm = () => {

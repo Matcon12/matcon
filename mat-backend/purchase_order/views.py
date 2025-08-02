@@ -136,6 +136,16 @@ def submit_form(request):
 
             created_orders = []
 
+            # Extract location from formData with default
+            location = formData.get('location', 'HBL')
+            
+            # Validate location
+            valid_locations = ['HBL', 'ASP']
+            if location not in valid_locations:
+                return JsonResponse({'error': f'Invalid location: {location}. Must be one of: {valid_locations}'}, status=400)
+            
+            logger.info(f"Processing form with location: {location}")
+            
             formData['poDate'] = datetime.strptime(formData.get('poDate', ''), '%d-%m-%Y').strftime('%Y-%m-%d') if formData['poDate'] else None
             formData['poValidity'] = datetime.strptime(formData.get('poValidity', ''), '%d-%m-%Y').strftime('%Y-%m-%d') if formData['poValidity'] else None
 
@@ -152,9 +162,19 @@ def submit_form(request):
                     if delivery_date:
                         delivery_date = datetime.strptime(delivery_date, '%d-%m-%Y').strftime('%Y-%m-%d')
 
-                    unit_price = round_decimal(product.get('unitPrice', 0))
+                    # Handle kit products vs regular products
+                    prod_code = product.get('prodId', '')
+                    is_kit = prod_code.startswith('KIT')
+                    
+                    if is_kit:
+                        logger.info(f"Processing kit product: {prod_code}")
+                        unit_price = 0  # Kit products don't have individual unit prices
+                    else:
+                        logger.info(f"Processing regular product: {prod_code}")
+                        unit_price = round_decimal(product.get('unitPrice', 0))
+                    
                     total_price = round_decimal(product.get('totalPrice', 0))
-                    qty = round_decimal(product.get('quantity',0))
+                    qty = round_decimal(product.get('quantity', 0))
 
                     order = CustomerPurchaseOrder(
                         slno=new_slno,
@@ -165,7 +185,7 @@ def submit_form(request):
                         cust_id=formData.get('customerId'),
                         consignee_id=formData.get('consigneeId'),
                         po_sl_no=product.get('poSlNo'),
-                        prod_code=product.get('prodId'),
+                        prod_code=prod_code,
                         prod_desc=product.get('productDesc'),
                         additional_desc=product.get('msrr'),
                         hsn_sac=product.get('hsn_sac'),
@@ -178,6 +198,7 @@ def submit_form(request):
                         qty_balance=qty,
                         delivery_date=delivery_date,
                         po_validity=formData.get('poValidity'),
+                        location=location,
                     )
                     try:
                         order.full_clean()  # Validate the model instance
