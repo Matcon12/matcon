@@ -57,6 +57,33 @@ export default function UpdatePO() {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   const [kitData, setKitData] = useState()
+  const [isKit, setIsKit] = useState(false)
+
+  // Function to validate common columns consistency across all records
+  const validateCommonColumnsConsistency = (mainData, kitData) => {
+    if (!mainData || !kitData || kitData.length === 0) return true
+
+    const commonFields = [
+      "podate",
+      "po_validity",
+      "quote_id",
+      "consignee_id",
+      "location",
+    ]
+    const firstRecord = mainData
+
+    for (const kitItem of kitData) {
+      for (const field of commonFields) {
+        if (firstRecord[field] !== kitItem[field]) {
+          console.warn(
+            `Inconsistent ${field}: main=${firstRecord[field]}, kit=${kitItem[field]}`
+          )
+          return false
+        }
+      }
+    }
+    return true
+  }
 
   useEffect(() => {
     api.get("/getCustomerData").then((response) => {
@@ -89,13 +116,36 @@ export default function UpdatePO() {
           })
           .then((response) => {
             let data = response.data.data[0]
-            console.log("data: ", data)
-            console.log(response.data.filtered_data)
+
             setKitData(response.data.filtered_data)
-            console.log(response.data.filtered_data)
+            setIsKit(response.data.is_kit || false)
+
+            // Show appropriate message based on product type
+            if (response.data.is_kit) {
+              toast.info(
+                `KIT product detected with ${
+                  response.data.filtered_data?.length || 0
+                } components`
+              )
+            } else if (response.data.filtered_data?.length > 0) {
+              toast.info(
+                `Regular product with ${response.data.filtered_data?.length} hierarchical items`
+              )
+            }
+
+            // Validate common columns consistency
+            const isConsistent = validateCommonColumnsConsistency(
+              data,
+              response.data.filtered_data
+            )
+            if (!isConsistent) {
+              toast.warning(
+                "Inconsistent common columns detected across related records. The system will synchronize them during update."
+              )
+            }
+
             const parsedDate = parse(data.podate, "yyyy-MM-dd", new Date())
             const formattedPoDate = format(parsedDate, "dd-MM-yyyy")
-            console.log(formattedPoDate)
 
             const parsedValidityDate = data.po_validity
               ? parse(data.po_validity, "yyyy-MM-dd", new Date())
@@ -103,7 +153,6 @@ export default function UpdatePO() {
             const formattedValidityDate = parsedValidityDate
               ? format(parsedValidityDate, "dd-MM-yyyy")
               : null
-            console.log(formattedValidityDate)
 
             const parsedDeliveryDate = data.delivery_date
               ? parse(data.delivery_date, "yyyy-MM-dd", new Date())
@@ -112,11 +161,7 @@ export default function UpdatePO() {
             const formattedDeliveryDate = parsedDeliveryDate
               ? format(parsedDeliveryDate, "dd-MM-yyyy")
               : null
-            console.log(
-              formattedPoDate,
-              formattedValidityDate,
-              formattedDeliveryDate
-            )
+
             setSearchData({
               pono: data.pono,
               podate: formattedPoDate,
@@ -141,11 +186,6 @@ export default function UpdatePO() {
               uom: data.uom,
               location: data.location,
             })
-            console.log("data: ", data)
-            console.log("searchData: ", searchData)
-            toast.info(
-              `Successfully fetched data for PO Sl No. ${data.po_sl_no}`
-            )
           })
           .catch((error) => {
             setSearchData((prevSearchData) => ({
@@ -172,7 +212,6 @@ export default function UpdatePO() {
               // omat: "",
               location: "",
             }))
-            console.log(error.response.data.error)
             toast.error("Error fetching the data")
           })
       : api
@@ -183,10 +222,20 @@ export default function UpdatePO() {
           })
           .then((response) => {
             const data = response.data.data
-            console.log("response: ", data)
-            setKitData(response.data.filtered_data)
+
             setPoslnos(response.data.po_sl_nos)
-            console.log(response.data.po_sl_nos)
+
+            // Validate common columns consistency
+            const isConsistent = validateCommonColumnsConsistency(
+              data,
+              response.data.filtered_data
+            )
+            if (!isConsistent) {
+              toast.warning(
+                "Inconsistent common columns detected across related records. The system will synchronize them during update."
+              )
+            }
+
             const parsedDate = parse(data.podate, "yyyy-MM-dd", new Date())
             const formattedPoDate = format(parsedDate, "dd-MM-yyyy")
             const validityDate = addYears(data.podate, 1)
@@ -223,7 +272,6 @@ export default function UpdatePO() {
             toast.success("Successfuly fetched Data!!")
           })
           .catch((error) => {
-            console.log(error.response.data.error)
             toast.error("ERROR in Fetching Data")
           })
   }
@@ -257,43 +305,68 @@ export default function UpdatePO() {
 
   const handleUpdate = (e) => {
     e.preventDefault()
-    console.log("update data: ", searchData)
-    console.log("kit data: ", kitData)
+
+    // Validate common columns before sending update
+    const validateCommonColumns = (data) => {
+      const required = ["podate", "location"]
+      const missing = required.filter((field) => !data[field])
+      if (missing.length > 0) {
+        toast.error(`Missing required fields: ${missing.join(", ")}`)
+        return false
+      }
+      return true
+    }
+
+    if (!validateCommonColumns(searchData)) {
+      return
+    }
+
     api
       .put("/updateForm", { searchInputs, searchData, kitData })
       .then((response) => {
-        console.log(response.data)
-        // resetDataForm()
-        // setKitData()
-        toast.success(
-          `Form Updated Successfully for PO Sl No: ${searchData.po_sl_no}`
-        )
+        // Show success message with information about synchronized records
+        if (response.data.message) {
+          toast.success(response.data.message)
+          // If kit components were updated, show additional info
+          if (response.data.kit_updates && response.data.kit_updates > 0) {
+            toast.info(
+              `Successfully updated ${response.data.kit_updates} kit component(s)`
+            )
+          }
+        } else {
+          toast.success(
+            `Form Updated Successfully for PO Sl No: ${searchData.po_sl_no}`
+          )
+        }
       })
       .catch((error) => {
-        console.error("Error updating data: ", error)
-        toast.error("ERROR: Invalid/Missing Input Data")
+        const errorMessage =
+          error.response?.data?.error || "ERROR: Invalid/Missing Input Data"
+        toast.error(errorMessage)
       })
   }
 
   const handleChangeData = (e) => {
     const { name, value } = e.target
-    console.log(name, value)
-    setSearchData({
-      ...searchData,
-      [name]: ["quantity", "unit_price", "qty_sent", "qty_balance"].includes(
-        name
-      )
-        ? parseFloat(value)
-        : value,
-    })
+
+    // Check if this is a common column
+    const commonColumns = ["quote_id", "consignee_id", "location"]
+    if (commonColumns.includes(name)) {
+      handleCommonColumnChange(name, value)
+    } else {
+      setSearchData({
+        ...searchData,
+        [name]: ["quantity", "unit_price", "qty_sent", "qty_balance"].includes(
+          name
+        )
+          ? parseFloat(value)
+          : value,
+      })
+    }
   }
 
   const onDateChange = (date, dateString) => {
-    console.log("dateString: ", dateString)
-    setSearchData((prevFormData) => ({
-      ...prevFormData,
-      podate: dateString,
-    }))
+    handleCommonColumnChange("podate", dateString)
   }
 
   const onDeliveryDateChange = (date, dateString) => {
@@ -302,9 +375,6 @@ export default function UpdatePO() {
     // Parse the dates from "dd-MM-yyyy" format
     const poDate = parse(poDateString, "dd-MM-yyyy", new Date())
     const deliveryDate = parse(dateString, "dd-MM-yyyy", new Date())
-
-    console.log("PO Date:", format(poDate, "dd-MM-yyyy"))
-    console.log("Delivery Date:", format(deliveryDate, "dd-MM-yyyy"))
 
     setSearchData((prevFormData) => ({
       ...prevFormData,
@@ -317,19 +387,33 @@ export default function UpdatePO() {
   }
 
   const onValidityDateChange = (date, dateString) => {
-    setSearchData((prevFormData) => ({
-      ...prevFormData,
-      po_validity: dateString,
+    handleCommonColumnChange("po_validity", dateString)
+  }
+
+  // Helper function to handle common column changes
+  const handleCommonColumnChange = (field, value) => {
+    setSearchData((prev) => ({
+      ...prev,
+      [field]: value,
     }))
+
+    // Optionally update kit data with the same common column value
+    // This ensures consistency in the frontend state
+    if (kitData && kitData.length > 0) {
+      setKitData((prev) =>
+        prev.map((item) => ({
+          ...item,
+          [field]: value,
+        }))
+      )
+    }
   }
 
   function parsePackSize(pk_Sz) {
     const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
     const match = pk_Sz.match(regex)
 
-    console.log("Match:", match)
     if (match) {
-      console.log("PkSz:", match[1], "UoM:", match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -343,13 +427,6 @@ export default function UpdatePO() {
   const handleQtyChange = (e) => {
     const { name, value } = e.target
     const qtyUom = parsePackSize(searchData.pack_size)
-    console.log(
-      "OnBlur-handleQtyChange",
-      name,
-      value,
-      qtyUom?.qty,
-      qtyUom?.u_o_m
-    )
 
     // Ensure that value is a valid, positive integer
     const qnty = parseFloat(value)
@@ -729,11 +806,52 @@ export default function UpdatePO() {
                   </div>
                 </div>
               </div>
-              {kitData &&
+              {isKit && (
+                <div
+                  style={{
+                    backgroundColor: "#e6f7ff",
+                    border: "1px solid #91d5ff",
+                    borderRadius: "4px",
+                    padding: "12px",
+                    margin: "16px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>📦</span>
+                  <span style={{ fontWeight: "500", color: "#1890ff" }}>
+                    This is a KIT product with {kitData?.length || 0} components
+                  </span>
+                </div>
+              )}
+              {isKit && (!kitData || kitData.length === 0) && (
+                <div
+                  style={{
+                    backgroundColor: "#fff7e6",
+                    border: "1px solid #ffd591",
+                    borderRadius: "4px",
+                    padding: "12px",
+                    margin: "16px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>⚠️</span>
+                  <span style={{ fontWeight: "500", color: "#fa8c16" }}>
+                    KIT product detected but no components found
+                  </span>
+                </div>
+              )}
+
+              {isKit &&
+                kitData &&
                 kitData.length > 0 &&
                 kitData.map((item, index) => {
                   return (
                     <UpdateProductForm
+                      key={`kit-${index}`}
                       data={item}
                       kitData={kitData}
                       setKitData={setKitData}

@@ -137,7 +137,7 @@ def submit_form(request):
             created_orders = []
 
             # Extract location from formData with default
-            location = formData.get('location', 'HBL')
+            location = formData.get('location', 'HBL')   
             
             # Validate location
             valid_locations = ['HBL', 'ASP']
@@ -254,7 +254,6 @@ def get_data_purchase_order(request):
                 filtered_po_sl_nos = [no for no in po_nos if no.startswith(data_dict['po_sl_no'] + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
                 filtered_data_dicts = [model_to_dict(item) for item in filtered_data]
-                print(filtered_data_dicts)
                 total_sum = CustomerPurchaseOrder.objects.filter(pono=po_no).aggregate(total_sum=Sum('total_price'))['total_sum']
                 
 
@@ -281,14 +280,25 @@ def get_data_po_cust(request):
             po_sl_no = request.GET.get('po_sl_no')
             if cust_id and po_no and po_sl_no:
                 data = list(CustomerPurchaseOrder.objects.filter(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no).order_by('po_sl_no').values())
+                
+                # Check if the main product is a KIT
+                is_kit = False
+                if data and len(data) > 0:
+                    main_product_code = data[0].get('prod_code', '')
+                    is_kit = main_product_code.startswith('KIT')
+                
                 po_nos = CustomerPurchaseOrder.objects.filter(pono=po_no).values_list('po_sl_no', flat=True).order_by('po_sl_no')
                 filtered_po_sl_nos = [no for no in po_nos if no.startswith(po_sl_no + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
-                print(filtered_data)
                 filtered_data_dicts = [model_to_dict(item) for item in filtered_data]
-                print(filtered_data_dicts)
                 total_sum = CustomerPurchaseOrder.objects.filter(pono=po_no).aggregate(total_sum=Sum('total_price'))['total_sum']
-                return JsonResponse({"success": True, "data": data, "filtered_data": filtered_data_dicts, "total_sum": total_sum})
+                return JsonResponse({
+                    "success": True, 
+                    "data": data, 
+                    "filtered_data": filtered_data_dicts, 
+                    "total_sum": total_sum,
+                    "is_kit": is_kit
+                })
             else:
                 return JsonResponse({'error': 'parameters are missing'}, status=400)
         except ObjectDoesNotExist:
@@ -302,13 +312,34 @@ def convert_date_format(date_str):
     formatted_date = date_obj.strftime('%Y-%m-%d')
     return formatted_date
 
+def validate_common_columns(search_data):
+    """
+    Validate that required common columns are present and valid
+    """
+    required_fields = ['podate', 'location']
+    missing_fields = [field for field in required_fields if not search_data.get(field)]
+    
+    if missing_fields:
+        return False, f"Missing required common columns: {', '.join(missing_fields)}"
+    
+    # Validate date formats if present
+    date_fields = ['podate', 'po_validity']
+    for field in date_fields:
+        if search_data.get(field):
+            try:
+                # Try to parse the date to ensure it's valid
+                datetime.strptime(search_data.get(field), '%d-%m-%Y')
+            except ValueError:
+                return False, f"Invalid date format for {field}. Expected format: DD-MM-YYYY"
+    
+    return True, None
+
 @csrf_exempt
 def update_purchase_order(request):
     if request.method == 'PUT':
         try:
             data = request.body.decode('utf-8')
             result = json.loads(data)
-            print('result:', result)
 
             search_inputs = result.get('searchData', {})
             cust_id = search_inputs.get('customer_id')
@@ -316,64 +347,135 @@ def update_purchase_order(request):
             po_sl_no = search_inputs.get('po_sl_no')
 
             kit_data = result.get('kitData', [])
-            # Print statement to debug `kit_data`
-            print('Kit data:', kit_data)
 
             if not all([cust_id, po_no, po_sl_no]):
                 return JsonResponse({'error': 'Missing required fields'}, status=400)
 
-            # Fetch the record to update
-            record = CustomerPurchaseOrder.objects.get(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
-
-            # Update the record with new values from searchData
+            # Extract common columns that should be synchronized across all related records
             search_data = result.get('searchData', {})
-            search_data['podate'] = convert_date_format(search_data.get('podate')) if search_data.get('podate') else None
-            search_data['po_validity'] = convert_date_format(search_data.get('po_validity')) if search_data.get('po_validity') else None
-            search_data['delivery_date'] = convert_date_format(search_data.get('delivery_date')) if search_data.get('delivery_date') else None
+            
+            # Validate common columns before proceeding
+            is_valid, error_message = validate_common_columns(search_data)
+            if not is_valid:
+                return JsonResponse({'error': error_message}, status=400)
+            
+            # Use atomic transaction to ensure all-or-nothing updates
+            with transaction.atomic():
+                # Convert date fields for common columns
+                common_columns = {
+                    'podate': convert_date_format(search_data.get('podate')) if search_data.get('podate') else None,
+                    'po_validity': convert_date_format(search_data.get('po_validity')) if search_data.get('po_validity') else None,
+                    'quote_id': search_data.get('quote_id'),
+                    'consignee_id': search_data.get('consignee_id'),
+                    'location': search_data.get('location')
+                }
 
-            for key, value in search_data.items():
-                if hasattr(record, key):
-                    setattr(record, key, value)
-                else:
-                    print(f"Invalid key in searchData: {key}")
+                # Find ALL records associated with the given PO number
+                # This includes ALL records with the same pono, regardless of po_sl_no hierarchy
+                all_records_to_update = CustomerPurchaseOrder.objects.filter(
+                    cust_id=cust_id, 
+                    pono=po_no
+                )
+                
+                # Get the main record for specific updates
+                main_record = CustomerPurchaseOrder.objects.get(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
 
-            record.save()
+                # Step 1: Update common columns for ALL related records
+                for record in all_records_to_update:
+                    for field, value in common_columns.items():
+                        if hasattr(record, field) and value is not None:
+                            setattr(record, field, value)
+                    record.save()
 
-            # Update kitData records
-            for kit_item in kit_data:
-                kit_cust_id = kit_item.get('customer_id')
-                kit_po_no = kit_item.get('pono')
-                kit_po_sl_no = kit_item.get('po_sl_no')
-
-                # Print statements to debug each kit item
-                print('Processing kit item:', kit_item)
-                print(f'kit_cust_id: {kit_cust_id}, kit_po_no: {kit_po_no}, kit_po_sl_no: {kit_po_sl_no}')
-
-                if not all([kit_cust_id, kit_po_no, kit_po_sl_no]):
-                    continue
-
-                try:
-                    # Fetch the kit record to update
-                    kit_record = CustomerPurchaseOrder.objects.get(cust_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
-
-                    # Update the kit record with new values from kitData
-                    for key, value in kit_item.items():
-                        if hasattr(kit_record, key):
-                            setattr(kit_record, key, value)
+                # Step 2: Update the main record with all searchData fields (with proper date conversion)
+                for key, value in search_data.items():
+                    if hasattr(main_record, key):
+                        # Convert date fields before setting
+                        if key in ['podate', 'po_validity', 'delivery_date'] and value:
+                            try:
+                                converted_value = convert_date_format(value)
+                                setattr(main_record, key, converted_value)
+                            except ValueError as e:
+                                return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
                         else:
-                            print({"error": "Invalid key in kitData: {key}"})
+                            setattr(main_record, key, value)
+                main_record.save()
 
-                    kit_record.save()
-                except CustomerPurchaseOrder.DoesNotExist:
-                    return JsonResponse(f"Kit record with po_sl_no {kit_po_sl_no} not found")
+                # Step 3: Update kitData records with their specific fields (excluding common columns)
+                for kit_item in kit_data:
+                    # Use the main record's cust_id since all records in the same PO belong to the same customer
+                    kit_cust_id = cust_id  # Use the main record's cust_id instead of kit_item.get('customer_id')
+                    kit_po_no = kit_item.get('pono')
+                    kit_po_sl_no = kit_item.get('po_sl_no')
 
-            return JsonResponse({'success': True})
-        except CustomerPurchaseOrder.DoesNotExist:
-            return JsonResponse({'error': 'Record not found'}, status=404)
+                    if not all([kit_cust_id, kit_po_no, kit_po_sl_no]):
+                        continue
+
+                    try:
+                        # Fetch the kit record to update
+                        kit_record = CustomerPurchaseOrder.objects.get(cust_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
+
+                        # Update the kit record with product-specific values from kitData
+                        # Exclude common columns as they're already updated above
+                        product_specific_fields = [
+                            'prod_code', 'prod_desc', 'additional_desc', 'pack_size',
+                            'quantity', 'unit_price', 'uom', 'hsn_sac', 'total_price',
+                            'qty_balance', 'qty_sent', 'delivery_date'
+                        ]
+                        
+                        for key, value in kit_item.items():
+                            if key in product_specific_fields and hasattr(kit_record, key):
+                                # Convert date fields for kit records too
+                                if key == 'delivery_date' and value:
+                                    try:
+                                        converted_value = convert_date_format(value)
+                                        setattr(kit_record, key, converted_value)
+                                    except ValueError as e:
+                                        return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                else:
+                                    setattr(kit_record, key, value)
+
+                        # Try the save operation
+                        kit_record.save()
+                        
+                        # If the model is unmanaged, try using update() as a fallback
+                        if not CustomerPurchaseOrder._meta.managed:
+                            update_fields = {}
+                            for key, value in kit_item.items():
+                                if key in product_specific_fields and hasattr(kit_record, key):
+                                    if key == 'delivery_date' and value:
+                                        try:
+                                            converted_value = convert_date_format(value)
+                                            update_fields[key] = converted_value
+                                        except ValueError as e:
+                                            return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                    else:
+                                        update_fields[key] = value
+                            
+                            if update_fields:
+                                CustomerPurchaseOrder.objects.filter(
+                                    cust_id=kit_cust_id, 
+                                    pono=kit_po_no, 
+                                    po_sl_no=kit_po_sl_no
+                                ).update(**update_fields)
+                    except CustomerPurchaseOrder.DoesNotExist:
+                        return JsonResponse({'error': f"Kit record with po_sl_no {kit_po_sl_no} not found"}, status=404)
+
+                # If we reach here, all updates were successful
+                kit_update_count = len(kit_data) if kit_data else 0
+                
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Updated {len(all_records_to_update)} records with synchronized common columns. Updated {kit_update_count} kit components.',
+                    'updated_records': [record.po_sl_no for record in all_records_to_update],
+                    'kit_updates': kit_update_count
+                })
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
     else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
     
 @csrf_exempt
 def add_customer_details(request):

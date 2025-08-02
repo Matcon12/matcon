@@ -15,6 +15,7 @@ export default function AutoCompleteComponent({
   required,
   readonly,
   nested,
+  handleArrayChange,
 }) {
   const [isFocused, setIsFocused] = useState(false)
 
@@ -48,90 +49,72 @@ export default function AutoCompleteComponent({
   }
 
   const filterSuggestions = (value) => {
-    console.log(
-      "Filtering suggestions:",
-      data,
-      "Search value:",
-      search_value,
-      "Value:",
-      value
-    )
-    const filtered = data.filter((item) =>
-      item[search_value]?.toLowerCase().includes(value.toLowerCase())
-    )
-    console.log("Filtered suggestions:", filtered)
+    if (!data || data.length === 0) {
+      return []
+    }
+
+    const filtered = data.filter((item) => {
+      const searchValue = item[search_value]
+      if (!searchValue) return false
+      return searchValue.toLowerCase().includes(value.toLowerCase())
+    })
+
     return filtered
   }
 
   const handleSpecialChange = (name, value) => {
-    if (!array || index === undefined) return
-
     if (name === "poSlNo") {
-      const selectedItem = data.find((item) => item.po_sl_no === value)
-      const isKit = selectedItem?.prod_code?.startsWith("KIT")
+      const fieldData = getFieldByPoSlNo(value, "prod_code")
+      const kitProducts = getKitProducts(value)
 
-      if (isKit) {
-        const kitProducts = getKitProducts(value).map((kitItem) => ({
-          noOfBatches: 1,
-          poSlNo: kitItem.po_sl_no,
-          hsnSac: kitItem.hsnSac,
-          prod_desc: kitItem.prod_desc,
-          quantities: [""],
-          batches: [""],
-          cocs: [""],
-        }))
-
-        setMainData((prev) => {
-          const updated = [...prev]
-          updated.splice(index + 1, 0, ...kitProducts)
-          return updated
-        })
-      }
-
-      setMainData((prev) => {
-        const updated = [...prev]
-        updated[index] = {
-          ...updated[index],
-          [name]: value,
-          hsnSac: getFieldByPoSlNo(value, "hsnSac"),
-          prodCode: getFieldByPoSlNo(value, "prod_code"),
-          prod_desc: getFieldByPoSlNo(value, "prod_desc"),
-        }
-        return updated
-      })
-    }
-
-    if (name === "prod_code") {
-      setMainData((prev) => {
-        const updated = [...prev]
-        updated[index] = {
-          ...updated[index],
-          [name]: value,
-          hsnSac: getFieldByPoSlNo(value, "hsnSac"),
-        }
-        return updated
-      })
-    }
-
-    if (name === "prodId") {
-      console.log("Handling prodId change:", value, "Index:", index)
-      setMainData((prev) => {
-        const updated = [...prev]
-        updated[index] = {
-          ...updated[index],
-          [name]: value,
-        }
-        console.log("Updated mainData:", updated)
-        return updated
-      })
+      const updated = mainData.map((item, idx) =>
+        idx === index
+          ? {
+              ...item,
+              [name]: value,
+              prod_code: fieldData?.prod_code || "",
+              prod_desc: fieldData?.prod_desc || "",
+              pack_size: fieldData?.pack_size || "",
+              uom: fieldData?.uom || "",
+              quantity: fieldData?.quantity || 0,
+              unit_price: fieldData?.unit_price || 0,
+              total_price: fieldData?.total_price || 0,
+              qty_sent: fieldData?.qty_sent || 0,
+              qty_balance: fieldData?.qty_balance || 0,
+              delivery_date: fieldData?.delivery_date || null,
+              hsn_sac: fieldData?.hsn_sac || "",
+              location: fieldData?.location || "",
+              quote_id: fieldData?.quote_id || "",
+              consignee_id: fieldData?.consignee_id || "",
+              podate: fieldData?.podate || "",
+              po_validity: fieldData?.po_validity || "",
+              additional_desc: fieldData?.additional_desc || "",
+              staggered_delivery: fieldData?.staggered_delivery || "",
+              kitData: kitProducts,
+            }
+          : item
+      )
+      setMainData(updated)
+    } else if (name === "prod_code" || name === "prodId") {
+      const updated = mainData.map((item, idx) =>
+        idx === index
+          ? {
+              ...item,
+              [name]: value,
+            }
+          : item
+      )
+      setMainData(updated)
     }
   }
 
   const handleChange = (e) => {
-    setIsFocused(true)
-    const { name, value } = e.target
+    const { value } = e.target
 
-    if (
+    // Call handleArrayChange if provided (for custom handling)
+    if (handleArrayChange) {
+      handleArrayChange(e)
+    } else if (
       (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
       array &&
       index !== undefined
@@ -150,18 +133,19 @@ export default function AutoCompleteComponent({
 
   const handleSuggestionClick = (suggestion) => {
     const value = suggestion[search_value]
-    console.log(
-      "Suggestion clicked:",
-      suggestion,
-      "Value:",
-      value,
-      "Name:",
-      name,
-      "Search value:",
-      search_value
-    )
 
-    if (
+    // Create a synthetic event for handleArrayChange
+    const syntheticEvent = {
+      target: {
+        value: value,
+        name: name,
+      },
+    }
+
+    // Call handleArrayChange if provided (for custom handling)
+    if (handleArrayChange) {
+      handleArrayChange(syntheticEvent)
+    } else if (
       (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
       array &&
       index !== undefined
@@ -177,7 +161,9 @@ export default function AutoCompleteComponent({
     setFilteredData([])
   }
 
-  const handleFocus = () => setIsFocused(true)
+  const handleFocus = () => {
+    setIsFocused(true)
+  }
   const handleBlur = () => setIsFocused(false)
 
   const inputValue = array

@@ -22,20 +22,19 @@ export default function UpdateProductForm({
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setKitData((prevData) =>
-      prevData.map((item, i) =>
+    setKitData((prevData) => {
+      const updatedData = prevData.map((item, i) =>
         i === index ? { ...item, [name]: value } : item
       )
-    )
+      return updatedData
+    })
   }
 
   function parsePackSize(pk_Sz) {
     const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
     const match = pk_Sz.match(regex)
 
-    console.log("Match:", match)
     if (match) {
-      console.log("PkSz:", match[1], "UoM:", match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -49,7 +48,6 @@ export default function UpdateProductForm({
   const handleQtyChange = (e) => {
     const { name, value } = e.target
     const qtyUom = parsePackSize(data.pack_size)
-    console.log("Pack:", qtyUom?.qty, "UoM:", qtyUom?.u_o_m)
 
     // Ensure that value is a valid, positive integer
     const qnty = parseFloat(value)
@@ -76,7 +74,6 @@ export default function UpdateProductForm({
   //      },
   //    })
   //    .then((response) => {
-  //      console.log(response.data)
   //      const { uom } = parsePackSize(response.data.pack_size)
   //      setKitData((prevData) =>
   //        prevData.map((item, idx) =>
@@ -92,7 +89,6 @@ export default function UpdateProductForm({
   //      )
   //    })
   //    .catch((error) => {
-  //      console.log(error.response.data.error)
   //    })
   //}, [data.prod_code])
 
@@ -100,7 +96,6 @@ export default function UpdateProductForm({
     setKitData((prevData) => {
       return prevData?.map((item) => {
         if (data.po_sl_no === item.po_sl_no) {
-          console.log("poslno:", data.po_sl_no)
           return {
             ...item,
             qty_balance: data.quantity - data.qty_sent,
@@ -114,7 +109,19 @@ export default function UpdateProductForm({
   return (
     <>
       <hr />
-      <h4>Kit component: {index + 1}</h4>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "12px",
+        }}
+      >
+        <span style={{ fontSize: "14px" }}>🔧</span>
+        <h4 style={{ margin: 0, color: "#1890ff" }}>
+          Kit Component {index + 1}
+        </h4>
+      </div>
       <div className="updateProductFormContainer">
         <div>
           <input
