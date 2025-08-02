@@ -156,7 +156,13 @@ export default function ProductDetails({
       e.target.focus()
       return
     }
-    // Validate quantity against pack size
+
+    // Skip pack size validation for kit products
+    if (formData[index].prodId.startsWith("KIT")) {
+      return
+    }
+
+    // Validate quantity against pack size for non-kit products
     // if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
     // If qnty is a fraction, this check fails, hence * 1000
     if (qnty < qtyUom.qty || (qnty * 1000) % (qtyUom.qty * 1000) !== 0) {

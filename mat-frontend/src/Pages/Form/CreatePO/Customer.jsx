@@ -48,7 +48,7 @@ export default function Customer() {
     quoteId: "",
     consigneeId: "",
     consigneeName: "",
-    location: "",
+    location: "HBL",
   }
 
   const initialProductDetails = {
@@ -87,15 +87,21 @@ export default function Customer() {
       }
     }
 
-    console.log(key, name)
+    console.log(key, name, value)
     setProductDetails(
       productDetails.map((productDetail, index) => {
         if (index === key) {
+          let processedValue = value
+
+          // Convert numeric fields to numbers, but handle empty values properly
+          if (["totalPrice", "quantity", "unitPrice"].includes(name)) {
+            const numValue = parseFloat(value)
+            processedValue = isNaN(numValue) ? "" : numValue
+          }
+
           return {
             ...productDetail,
-            [name]: ["totalPrice", "quantity", "unitPrice"].includes(name)
-              ? parseFloat(value)
-              : value,
+            [name]: processedValue,
           }
         }
         return productDetail
@@ -106,24 +112,109 @@ export default function Customer() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    api
-      .post("/submitForm", {
-        formData: formData,
-        productDetails: productDetails,
-      })
-      .then((response) => {
-        console.log(response.data)
-        toast.success(`PO No: ${formData.poNo} created successfully`)
-        resetForm()
-      })
-      .catch((error) => {
-        toast.error("ERROR: Invalid/Missing Input Data")
-        console.log(
-          "API Error:",
-          error?.response?.data?.error || error?.message || "Unknown error"
-        )
+
+    // Validate required fields
+    if (
+      !formData.customerId ||
+      !formData.poNo ||
+      !formData.poDate ||
+      !formData.location
+    ) {
+      toast.error(
+        "Please fill in all required fields (Customer ID, PO No, PO Date, Location)"
+      )
+      return
+    }
+
+    // Validate product details
+    if (!productDetails || productDetails.length === 0) {
+      toast.error("Please add at least one product")
+      return
+    }
+
+    // Validate each product has required fields
+    for (let i = 0; i < productDetails.length; i++) {
+      const product = productDetails[i]
+      console.log(`Product ${i + 1} data:`, product)
+
+      // Skip validation for completely empty products (they will be filtered out)
+      const hasAnyData = product.prodId || product.productDesc
+      if (!hasAnyData) {
+        continue
+      }
+
+      // Check if required fields are missing or empty
+      if (!product.prodId || product.prodId.trim() === "") {
+        toast.error(`Please enter Product Code for product ${i + 1}`)
         return
-      })
+      }
+
+      // For kit products, require quantity but skip unit price
+      if (product.prodId.startsWith("KIT")) {
+        if (!product.quantity || product.quantity <= 0) {
+          toast.error(`Please enter a valid Quantity for product ${i + 1}`)
+          return
+        }
+      } else {
+        // For regular products, require both quantity and unit price
+        if (!product.quantity || product.quantity <= 0) {
+          toast.error(`Please enter a valid Quantity for product ${i + 1}`)
+          return
+        }
+
+        if (!product.unitPrice || product.unitPrice <= 0) {
+          toast.error(`Please enter a valid Unit Price for product ${i + 1}`)
+          return
+        }
+      }
+    }
+
+    // Filter out empty products before submission
+    const validProductDetails = productDetails.filter((product) => {
+      // For kit products, require product code and quantity
+      if (product.prodId && product.prodId.startsWith("KIT")) {
+        return (
+          product.prodId.trim() !== "" &&
+          product.quantity &&
+          product.quantity > 0
+        )
+      }
+
+      // For regular products, require all fields
+      return (
+        product.prodId &&
+        product.prodId.trim() !== "" &&
+        product.quantity &&
+        product.quantity > 0 &&
+        product.unitPrice &&
+        product.unitPrice > 0
+      )
+    })
+
+    console.log({
+      formData: formData,
+      productDetails: validProductDetails,
+    })
+
+    // Submit the form
+    // api
+    //   .post("/submitForm", {
+    //     formData: formData,
+    //     productDetails: validProductDetails,
+    //   })
+    //   .then((response) => {
+    //     console.log(response.data)
+    //     toast.success(`PO No: ${formData.poNo} created successfully`)
+    //     resetForm()
+    //   })
+    //   .catch((error) => {
+    //     toast.error("ERROR: Invalid/Missing Input Data")
+    //     console.log(
+    //       "API Error:",
+    //       error?.response?.data?.error || error?.message || "Unknown error"
+    //     )
+    //     return
+    //   })
   }
 
   const resetForm = () => {
@@ -439,7 +530,7 @@ export default function Customer() {
                 <div>
                   <select
                     name="location"
-                    value={formData.location || "HBL"}
+                    value={formData.location}
                     onChange={handleChange}
                     required
                   >
