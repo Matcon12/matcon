@@ -445,6 +445,28 @@ export default function UpdatePO() {
     }
   }
 
+  // Function to calculate main kit quantity from kit components
+  const calculateMainKitQuantity = (kitData) => {
+    if (!kitData || kitData.length === 0) return 0
+
+    return kitData.reduce((sum, component) => {
+      const qty = parseFloat(component.quantity) || 0
+      return sum + qty
+    }, 0)
+  }
+
+  // Update main kit quantity when kit component quantities change
+  useEffect(() => {
+    if (isKit && kitData && kitData.length > 0) {
+      const mainKitQuantity = calculateMainKitQuantity(kitData)
+
+      setSearchData((prevData) => ({
+        ...prevData,
+        quantity: mainKitQuantity,
+      }))
+    }
+  }, [kitData, isKit])
+
   useEffect(() => {
     const balance = searchData.quantity - searchData.qty_sent
     const total = parseFloat(
@@ -692,12 +714,34 @@ export default function UpdatePO() {
                     onChange={handleChangeData}
                     onBlur={handleQtyChange}
                     placeholder=" "
-                    //                    readOnly
+                    readOnly={isKit && kitData && kitData.length > 0}
+                    style={{
+                      backgroundColor:
+                        isKit && kitData && kitData.length > 0
+                          ? "#f5f5f5"
+                          : "white",
+                      cursor:
+                        isKit && kitData && kitData.length > 0
+                          ? "not-allowed"
+                          : "text",
+                    }}
                   />
                   <label
                     alt="Enter the Quantity"
                     placeholder="Quantity"
                   ></label>
+                  {isKit && kitData && kitData.length > 0 && (
+                    <small
+                      style={{
+                        color: "#666",
+                        fontSize: "12px",
+                        marginTop: "4px",
+                        display: "block",
+                      }}
+                    >
+                      Auto-calculated from kit components
+                    </small>
+                  )}
                 </div>
                 {/* <div>
                   <input

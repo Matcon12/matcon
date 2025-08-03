@@ -64,6 +64,19 @@ export default function UpdateProductForm({
       e.target.focus()
       return
     }
+
+    // Update qty_balance when quantity changes
+    setKitData((prevData) => {
+      return prevData?.map((item) => {
+        if (data.po_sl_no === item.po_sl_no) {
+          return {
+            ...item,
+            qty_balance: qnty - (parseFloat(item.qty_sent) || 0),
+          }
+        }
+        return item
+      })
+    })
   }
 
   //useEffect(() => {

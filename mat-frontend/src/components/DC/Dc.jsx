@@ -167,13 +167,24 @@ function DcReportC({ formData }) {
                   data.pack_size
                 )
 
+                // Calculate total quantity ensuring it equals number_of_packs * pack_size
+                const isKitComponent =
+                  data.po_sl_no && data.po_sl_no.includes(".")
+                const totalQuantity = isKitComponent
+                  ? (data.number_of_packs * packSize).toFixed(2)
+                  : data.qty_delivered
+
                 console.log(`Debug - DC Item ${data.po_sl_no}:`, {
                   po_sl_no: data.po_sl_no,
                   number_of_packs: data.number_of_packs,
                   pack_size: data.pack_size,
                   qty_delivered: data.qty_delivered,
                   displayed_no_of_packs: data.number_of_packs || 0,
-                  displayed_total_qty: data.qty_delivered,
+                  displayed_total_qty: totalQuantity,
+                  isKitComponent: isKitComponent,
+                  calculated_total: isKitComponent
+                    ? (data.number_of_packs * packSize).toFixed(2)
+                    : "N/A",
                 })
 
                 return (
@@ -187,7 +198,7 @@ function DcReportC({ formData }) {
                     <td className="a-right">{data.po_sl_no}</td>
                     <td className="a-right">{data.number_of_packs || 0}</td>
                     <td className="a-right">{data.pack_size}</td>
-                    <td className="a-right">{data.qty_delivered}</td>
+                    <td className="a-right">{totalQuantity}</td>
                     <td>{unit}</td>
                     <td className="a-right">{data.batch}</td>
                     {/* <td>{data.coc}</td> */}

@@ -424,6 +424,20 @@ export default function Invoice() {
     setEntries(newEntries)
   }
 
+  // Function to calculate main kit quantity from kit components
+  const calculateMainKitQuantity = (kitData) => {
+    if (!kitData || kitData.length === 0) return 0
+
+    const total = kitData.reduce((sum, component) => {
+      const qty = parseFloat(component.quantity) || 0
+      console.log("Kit component quantity:", component.po_sl_no, qty)
+      return sum + qty
+    }, 0)
+
+    console.log("Total calculated quantity:", total)
+    return total
+  }
+
   const handleKitComponentQuantityChange = (entryIndex, kitIndex, value) => {
     console.log("Kit component quantity change:", {
       entryIndex,
@@ -453,6 +467,33 @@ export default function Invoice() {
         ...newEntries[entryIndex].kitData[kitIndex],
         quantity: value,
       }
+
+      // Calculate and update main kit quantity
+      if (
+        newEntries[entryIndex].kitData &&
+        newEntries[entryIndex].kitData.length > 0
+      ) {
+        const mainKitQuantity = calculateMainKitQuantity(
+          newEntries[entryIndex].kitData
+        )
+        console.log(
+          "Calculated main kit quantity:",
+          mainKitQuantity,
+          "from kit data:",
+          newEntries[entryIndex].kitData
+        )
+
+        // Update the first element of quantities array (main kit quantity)
+        if (!newEntries[entryIndex].quantities) {
+          newEntries[entryIndex].quantities = []
+        }
+        newEntries[entryIndex].quantities[0] = mainKitQuantity.toString()
+        console.log(
+          "Updated quantities array:",
+          newEntries[entryIndex].quantities
+        )
+      }
+
       setEntries(newEntries)
     }
   }
@@ -506,6 +547,36 @@ export default function Invoice() {
         ...newEntries[entryIndex].kitData[kitIndex],
         [field]: value,
       }
+
+      // If the field being changed is quantity, recalculate main kit quantity
+      if (field === "quantity") {
+        console.log(
+          "Kit component quantity field changed, recalculating main kit quantity"
+        )
+        if (
+          newEntries[entryIndex].kitData &&
+          newEntries[entryIndex].kitData.length > 0
+        ) {
+          const mainKitQuantity = calculateMainKitQuantity(
+            newEntries[entryIndex].kitData
+          )
+          console.log(
+            "Calculated main kit quantity from field change:",
+            mainKitQuantity
+          )
+
+          // Update the first element of quantities array (main kit quantity)
+          if (!newEntries[entryIndex].quantities) {
+            newEntries[entryIndex].quantities = []
+          }
+          newEntries[entryIndex].quantities[0] = mainKitQuantity.toString()
+          console.log(
+            "Updated quantities array from field change:",
+            newEntries[entryIndex].quantities
+          )
+        }
+      }
+
       setEntries(newEntries)
     }
   }

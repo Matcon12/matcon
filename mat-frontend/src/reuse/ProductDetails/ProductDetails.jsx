@@ -47,7 +47,10 @@ export default function ProductDetails({
   }
 
   useEffect(() => {
-    let total = parseFloat(formData[index].quantity * formData[index].unitPrice)
+    const isKitComponent =
+      formData[index].poSlNo && formData[index].poSlNo.includes(".")
+    const unitPrice = isKitComponent ? 0 : formData[index].unitPrice || 0
+    let total = parseFloat(formData[index].quantity * unitPrice)
 
     setTotal(total.toFixed(2), index)
   }, [formData[index].quantity, formData[index].unitPrice])
@@ -116,12 +119,14 @@ export default function ProductDetails({
         setFormData(
           formData.map((productDetail, idx) => {
             if (idx === index) {
+              const isKitComponent =
+                productDetail.poSlNo && productDetail.poSlNo.includes(".")
               return {
                 ...productDetail,
                 packSize: response.data.pack_size,
                 productDesc: response.data.prod_desc,
                 uom: parsedPkSz.u_o_m,
-                unitPrice: response.data.price || "",
+                unitPrice: isKitComponent ? 0 : response.data.price || "",
               }
             }
             return productDetail
@@ -262,7 +267,7 @@ export default function ProductDetails({
       return newPoSlNo
     }
 
-    // Create new entries based on kitQuantity
+    // Create new entries based on kitQuantity (only required fields for kit components)
     const newEntries = Array.from({ length: kitQuantity }, (_, index) => ({
       poSlNo: new_poSlNo(index),
       prodId: "",
@@ -270,10 +275,10 @@ export default function ProductDetails({
       productDesc: "",
       msrr: "",
       uom: "",
-      hsn_sac: "",
       quantity: "",
       unitPrice: 0,
       totalPrice: 0,
+      hsn_sac: "",
       deliveryDate: null,
     }))
 
@@ -292,6 +297,8 @@ export default function ProductDetails({
   }
 
   const checkKit = isKit[index]
+  const isKitComponent =
+    formData[index].poSlNo && formData[index].poSlNo.includes(".")
 
   return (
     <>
@@ -374,59 +381,54 @@ export default function ProductDetails({
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
           </div>
-          <div>
-            <input
-              type="number"
-              name="unitPrice"
-              value={formData[index].unitPrice}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-            />
-            <label
-              alt="Enter the Unit Price"
-              placeholder="Rate per UOM"
-            ></label>
-          </div>
+          {/* Show unit price, total price, and HSN/SAC only for non-kit components */}
+          {!isKitComponent && (
+            <>
+              <div>
+                <input
+                  type="number"
+                  name="unitPrice"
+                  value={formData[index].unitPrice}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                />
+                <label
+                  alt="Enter the Unit Price"
+                  placeholder="Rate per UOM"
+                ></label>
+              </div>
 
-          <div>
-            <input
-              type="number"
-              name="totalPrice"
-              value={formData[index].totalPrice}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-              readOnly
-            />
-            <label
-              alt="Enter the Total Price"
-              placeholder="Total Price"
-            ></label>
-          </div>
-          <div>
-            <input
-              type="text"
-              name="hsn_sac"
-              value={formData[index].hsn_sac}
-              onChange={(e) => handleChange(index, e)}
-              placeholder=" "
-            />
-            <label alt="Enter the HSN/SAC" placeholder="HSN/SAC Code:"></label>
-          </div>
-          {/*<div className="input-container">
-            <select
-              name="uom"
-              value={formData[index].uom}
-              onChange={(e) => handleChange(index, e)}
-            >
-              <option value="" disabled>
-                Select an option
-              </option>
-              <option value="Ltr">Ltr</option>
-              <option value="Kg">Kg</option>
-              <option value="No.">No.</option>
-            </select>
-            <label alt="Select an Option" placeholder="UOM"></label>
-          </div>*/}
+              <div>
+                <input
+                  type="number"
+                  name="totalPrice"
+                  value={formData[index].totalPrice}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                  readOnly
+                />
+                <label
+                  alt="Enter the Total Price"
+                  placeholder="Total Price"
+                ></label>
+              </div>
+              <div>
+                <input
+                  type="text"
+                  name="hsn_sac"
+                  value={formData[index].hsn_sac}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                />
+                <label
+                  alt="Enter the HSN/SAC"
+                  placeholder="HSN/SAC Code:"
+                ></label>
+              </div>
+            </>
+          )}
+
+          {/* Show UOM for all products */}
           <div>
             <input
               type="text"
@@ -437,7 +439,8 @@ export default function ProductDetails({
             <label alt="Enter the UoM" placeholder="UOM"></label>
           </div>
 
-          {checkKit ? (
+          {/* Show delivery date only for non-kit components */}
+          {checkKit && !isKitComponent ? (
             <div className="deliveryDate">
               <div className="datePickerContainer">
                 <Space direction="vertical">

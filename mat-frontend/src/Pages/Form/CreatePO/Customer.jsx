@@ -99,6 +99,18 @@ export default function Customer() {
             processedValue = isNaN(numValue) ? "" : numValue
           }
 
+          // Check if this is a kit component (po_sl_no contains a dot like "2.1", "2.2")
+          const isKitComponent =
+            productDetail.poSlNo && productDetail.poSlNo.includes(".")
+
+          // For kit components, force unit price to 0
+          if (isKitComponent && name === "unitPrice") {
+            processedValue = 0
+            toast.info(
+              "Unit price is automatically set to 0 for kit components"
+            )
+          }
+
           return {
             ...productDetail,
             [name]: processedValue,
@@ -149,14 +161,28 @@ export default function Customer() {
         return
       }
 
-      // For kit products, require quantity but skip unit price
-      if (product.prodId.startsWith("KIT")) {
+      // Check if this is a kit component (po_sl_no contains a dot like "2.1", "2.2")
+      const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
+
+      // For kit components, require quantity but unit price must be 0
+      if (isKitComponent) {
         if (!product.quantity || product.quantity <= 0) {
           toast.error(`Please enter a valid Quantity for product ${i + 1}`)
           return
         }
+        // For kit components, ensure unit price is 0 or empty
+        if (
+          product.unitPrice !== 0 &&
+          product.unitPrice !== "" &&
+          product.unitPrice !== null
+        ) {
+          toast.error(
+            `Unit price must be 0 for kit components (product ${i + 1})`
+          )
+          return
+        }
       } else {
-        // For regular products, require both quantity and unit price
+        // For regular products and main kit products, require both quantity and unit price
         if (!product.quantity || product.quantity <= 0) {
           toast.error(`Please enter a valid Quantity for product ${i + 1}`)
           return
@@ -171,8 +197,11 @@ export default function Customer() {
 
     // Filter out empty products before submission
     const validProductDetails = productDetails.filter((product) => {
-      // For kit products, require product code and quantity
-      if (product.prodId && product.prodId.startsWith("KIT")) {
+      // Check if this is a kit component
+      const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
+
+      // For kit components, require product code and quantity (no unit price requirement)
+      if (product.prodId && isKitComponent) {
         return (
           product.prodId.trim() !== "" &&
           product.quantity &&
@@ -180,7 +209,7 @@ export default function Customer() {
         )
       }
 
-      // For regular products, require all fields
+      // For regular products and main kit products, require all fields including unit price
       return (
         product.prodId &&
         product.prodId.trim() !== "" &&
@@ -191,16 +220,29 @@ export default function Customer() {
       )
     })
 
+    // Ensure kit components have unitPrice set to 0
+    const finalProductDetails = validProductDetails.map((product) => {
+      const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
+      if (isKitComponent) {
+        return {
+          ...product,
+          unitPrice: 0,
+          totalPrice: 0,
+        }
+      }
+      return product
+    })
+
     console.log({
       formData: formData,
-      productDetails: validProductDetails,
+      productDetails: finalProductDetails,
     })
 
     // Submit the form
     api
       .post("/submitForm", {
         formData: formData,
-        productDetails: validProductDetails,
+        productDetails: finalProductDetails,
       })
       .then((response) => {
         console.log(response.data)

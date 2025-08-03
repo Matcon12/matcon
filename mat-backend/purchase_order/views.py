@@ -168,11 +168,11 @@ def submit_form(request):
                     is_kit = prod_code.startswith('KIT')
                     is_kit_component = po_sl_no and '.' in po_sl_no  # Kit components have po_sl_no like "2.1", "2.2"
                     
-                    if is_kit or is_kit_component:
-                        logger.info(f"Processing {'kit component' if is_kit_component else 'kit product'}: {prod_code}")
-                        unit_price = 0  # Kit products and components don't have individual unit prices
+                    if is_kit_component:
+                        logger.info(f"Processing kit component: {prod_code}")
+                        unit_price = 0  # Only kit components don't have individual unit prices
                     else:
-                        logger.info(f"Processing regular product: {prod_code}")
+                        logger.info(f"Processing {'kit product' if is_kit else 'regular product'}: {prod_code}")
                         unit_price = round_decimal(product.get('unitPrice', 0))
                     
                     total_price = round_decimal(product.get('totalPrice', 0))
@@ -1428,6 +1428,11 @@ def invoice_generation(request):
             number_of_packs = 0
             try:
                 qty_delivered = float(instance.qty_delivered) if instance.qty_delivered else 0
+                
+                # Check if this is a kit component (po_sl_no contains a dot)
+                is_kit_component = instance.po_sl_no and '.' in instance.po_sl_no
+                
+                # For both regular products and kit components, calculate number_of_packs = qty_delivered / pack_size
                 import re
                 pack_size_str = str(instance.pack_size) if instance.pack_size else "1"
                 match = re.search(r"(\d+(?:\.\d+)?)", pack_size_str)
@@ -1436,6 +1441,11 @@ def invoice_generation(request):
                     number_of_packs = qty_delivered / pack_size
                 else:
                     number_of_packs = qty_delivered
+                
+                if is_kit_component:
+                    print(f"Kit component {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
+                else:
+                    print(f"Regular product {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
             except (ValueError, TypeError):
                 number_of_packs = 0
 
@@ -1488,21 +1498,27 @@ def invoice_generation(request):
                     print(f"Debug - Added number_of_packs to inv_result for {inv_item['po_sl_no']}: {otwdc_item.get('number_of_packs', 0)}")
                     break
         
-        # For main kit products, calculate number_of_packs as sum of kit components
+        # For main kit products, calculate number_of_packs as sum of kit components' number_of_packs
         for inv_item in inv_result:
             # Check if this is a main kit product (po_sl_no doesn't contain a dot)
             po_sl_no = inv_item['po_sl_no']
             if '.' not in po_sl_no and po_sl_no not in ['fr', 'ins', 'oc']:
                 # Find all kit components for this main kit (po_sl_no with dots)
                 kit_components_number_of_packs_sum = 0
+                kit_components_qty_sum = 0
                 for otwdc_item in otwdc_result:
                     if otwdc_item['po_sl_no'].startswith(po_sl_no + '.') or otwdc_item['po_sl_no'] == po_sl_no + '.1' or otwdc_item['po_sl_no'] == po_sl_no + '.2':
                         kit_components_number_of_packs_sum += otwdc_item.get('number_of_packs', 0)
+                        kit_components_qty_sum += float(otwdc_item.get('qty_delivered', 0))
                 
-                # Update main kit with sum of kit components' number_of_packs
+                # Update main kit with sum of kit components' number_of_packs and qty_delivered
                 if kit_components_number_of_packs_sum > 0:
                     inv_item['number_of_packs'] = kit_components_number_of_packs_sum
-                    print(f"Debug - Updated main kit {po_sl_no} number_of_packs to sum of components: {kit_components_number_of_packs_sum}")
+                    inv_item['qty_delivered'] = kit_components_qty_sum
+                    print(f"Debug - Updated main kit {po_sl_no}: number_of_packs={kit_components_number_of_packs_sum}, qty_delivered={kit_components_qty_sum}")
+                else:
+                    # If no kit components found, keep the original calculation
+                    print(f"Debug - No kit components found for main kit {po_sl_no}, keeping original number_of_packs")
             
             # Ensure kit components have unit_price = 0
             if '.' in po_sl_no:
@@ -1724,7 +1740,7 @@ def invoice_report(request):
                                    .select_related('cust_id')\
                                    .values('cust_id','gcn_no', 'gcn_date', 'po_sl_no', 'qty_delivered',
                                            'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price',
-                                           'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac')\
+                                           'cust_id__cust_name', 'cust_id__cust_gst_id', 'hsn_sac', 'location')\
                                    .order_by('gcn_date')
 
             # Create DataFrame
@@ -1739,8 +1755,8 @@ def invoice_report(request):
 
             # Reformat DataFrame
             df = df[['cust_id','cust_id__cust_name', 'cust_id__cust_gst_id', 'gcn_no', 'gcn_date', 'hsn_sac',
-                     'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price']]
-            df.insert(0, 'Sl No', range(1, len(df) + 1))
+                     'qty_delivered', 'taxable_amt', 'cgst_price', 'sgst_price', 'igst_price', 'location']]
+            df.insert(0, 'Sl No', list(range(1, len(df) + 1)))
 
             # Reformat the 'gcn_date' into a readable string format
             df['gcn_date'] = pd.to_datetime(df['gcn_date']).dt.strftime('%d-%m-%Y')
@@ -1756,6 +1772,7 @@ def invoice_report(request):
                 'igst_price': 'IGST Price (18%)',
                 'cust_id__cust_name': 'Customer Name',
                 'cust_id__cust_gst_id': 'Customer GST IN',
+                'location': 'Location',
             })
             #------------------------------------------------------------------------------------------
 
@@ -1778,8 +1795,8 @@ def invoice_report(request):
                 'IGST Price (18%)': 'sum'
             }).reset_index()
 
-            df1 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'HSN/SAC']].drop_duplicates()
-            df2 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN']].drop_duplicates()
+            df1 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'HSN/SAC', 'Location']].drop_duplicates()
+            df2 = df[['Invoice Number', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'Location']].drop_duplicates()
 
             df1['Customer GST IN'] = df1['Customer GST IN'].fillna('')
             df2['Customer GST IN'] = df2['Customer GST IN'].fillna('')
@@ -1790,8 +1807,8 @@ def invoice_report(request):
             combined_df = pd.merge(df1, grouped, on=['Invoice Number', 'HSN/SAC'], how='left')
             combined_df2 = pd.merge(df2, grouped2, on=['Invoice Number'], how='left')
 
-            combined_df['Sl No'] = range(1, len(combined_df) + 1)
-            combined_df2['Sl No'] = range(1, len(combined_df2) + 1)
+            combined_df['Sl No'] = list(range(1, len(combined_df) + 1))
+            combined_df2['Sl No'] = list(range(1, len(combined_df2) + 1))
 
             total_taxable_amt = grouped['Ass.Value'].sum()
             total_cgst_price = grouped['CGST Price (9%)'].sum()
@@ -1802,6 +1819,15 @@ def invoice_report(request):
             total_cgst_price2 = grouped2['CGST Price (9%)'].sum()
             total_sgst_price2 = grouped2['SGST Price (9%)'].sum()
             total_igst_price2 = grouped2['IGST Price (18%)'].sum()
+
+            # Calculate total invoice values
+            total_invoice_value = total_taxable_amt + total_igst_price + total_cgst_price + total_sgst_price
+            total_invoice_value2 = total_taxable_amt2 + total_igst_price2 + total_cgst_price2 + total_sgst_price2
+
+            combined_df['Invoice Value'] = combined_df['Ass.Value'] + combined_df['IGST Price (18%)'] + combined_df['CGST Price (9%)'] + combined_df['SGST Price (9%)']
+            combined_df['Invoice Value'] = pd.to_numeric(combined_df['Invoice Value']).round()
+            combined_df2['Invoice Value'] = combined_df2['Ass.Value'] + combined_df2['IGST Price (18%)'] + combined_df2['CGST Price (9%)'] + combined_df2['SGST Price (9%)']
+            combined_df2['Invoice Value'] = pd.to_numeric(combined_df2['Invoice Value']).round()
 
             total_row = pd.DataFrame({
                 'Sl No': 'Total',
@@ -1817,6 +1843,8 @@ def invoice_report(request):
                 'SGST Price (9%)': total_sgst_price,
                 'IGST Price (18%)': total_igst_price,
                 'Round Off': '',
+                'Location': '',
+                'Invoice Value': total_invoice_value.round(),
             }, index=[0])
 
             total_row2 = pd.DataFrame({
@@ -1833,17 +1861,12 @@ def invoice_report(request):
                 'SGST Price (9%)': total_sgst_price2,
                 'IGST Price (18%)': total_igst_price2,
                 'Round Off': '',
+                'Location': '',
+                'Invoice Value': total_invoice_value2.round(),
             }, index=[0])
 
             combined_df = pd.concat([combined_df, total_row], ignore_index=True)
             combined_df2 = pd.concat([combined_df2, total_row2], ignore_index=True)
-
-            # return JsonResponse({'result': combined_df.to_dict()})
-
-            combined_df['Invoice Value'] = combined_df['Ass.Value'] + combined_df['IGST Price (18%)'] + combined_df['CGST Price (9%)'] + combined_df['SGST Price (9%)']
-            combined_df['Invoice Value'] = pd.to_numeric(combined_df['Invoice Value']).round()
-            combined_df2['Invoice Value'] = combined_df2['Ass.Value'] + combined_df2['IGST Price (18%)'] + combined_df2['CGST Price (9%)'] + combined_df2['SGST Price (9%)']
-            combined_df2['Invoice Value'] = pd.to_numeric(combined_df2['Invoice Value']).round()
 
             combined_df['Round Off'] = combined_df.apply(
                 lambda row: float(row['Invoice Value']) - (
@@ -1851,7 +1874,7 @@ def invoice_report(request):
                     float(row['IGST Price (18%)']) +
                     float(row['CGST Price (9%)']) +
                     float(row['SGST Price (9%)'])
-                ) if row['Sl No'] != 'Total' else None,
+                ) if row['Sl No'] != 'Total' else '',
                 axis=1
             )
             combined_df2['Round Off'] = combined_df2.apply(
@@ -1860,7 +1883,7 @@ def invoice_report(request):
                     float(row['IGST Price (18%)']) +
                     float(row['CGST Price (9%)']) +
                     float(row['SGST Price (9%)'])
-                ) if row['Sl No'] != 'Total' else None,
+                ) if row['Sl No'] != 'Total' else '',
                 axis=1
             )
 
@@ -1872,11 +1895,15 @@ def invoice_report(request):
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
             combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
 
-            column_order = ['Sl No', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
+            column_order = ['Sl No', 'Location', 'Cust-ID', 'Customer Name', 'Customer GST IN', 'Invoice Number', 'Invoice Date', 'HSN/SAC', 'Quantity', 'Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
             combined_df = combined_df[column_order]
             combined_df2 = combined_df2[column_order]
 
             combined_df2['HSN/SAC'] = combined_df2['HSN/SAC'].fillna('')
+
+            # Replace any remaining NaN values with empty strings to avoid null in JSON
+            combined_df = combined_df.fillna('')
+            combined_df2 = combined_df2.fillna('')
 
             # Convert to JSON
             json_data = combined_df.to_json(orient='records')

@@ -23,11 +23,14 @@ export default function POTable({
 
   const calculateTotalQuantity = po_data
     .filter((item) => item.po_no)
-    .reduce(
-      (sum, item) =>
-        sum + parseFloat(item.number_of_packs || item.qty_delivered),
-      0
-    )
+    .reduce((sum, item) => {
+      const { numericValue: packSize } = stripUnits(item.pack_size)
+      const quantity =
+        item.po_sl_no && item.po_sl_no.includes(".")
+          ? parseFloat(item.number_of_packs || 0) * packSize
+          : parseFloat(item.number_of_packs || item.qty_delivered || 0)
+      return sum + quantity
+    }, 0)
 
   function stripUnits(value) {
     const numericValue = parseFloat(value.replace(/[^\d.-]/g, ""))
@@ -120,7 +123,9 @@ export default function POTable({
                   data.prod_desc !== "Insurance Charges" &&
                   data.prod_desc !==
                     "Packing forwarding with Freight charges" &&
-                  (data.number_of_packs || data.qty_delivered)}
+                  (data.po_sl_no && data.po_sl_no.includes(".")
+                    ? (data.number_of_packs * packSize).toFixed(2)
+                    : data.number_of_packs || data.qty_delivered)}
               </td>
               <td className="col6">{unit}</td>
               <td className="col7">{data.unit_price.toFixed(2)}</td>
@@ -155,7 +160,7 @@ export default function POTable({
             Total:
           </td>
           {/* <td className="col5">{total_qty}</td> */}
-          <td className="col5">{calculateTotalQuantity}</td>
+          <td className="col5">{calculateTotalQuantity.toFixed(2)}</td>
           <td className="col15"></td>
           <td className="col7"></td>
           <td className="col8">
