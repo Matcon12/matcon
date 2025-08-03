@@ -164,11 +164,13 @@ def submit_form(request):
 
                     # Handle kit products vs regular products
                     prod_code = product.get('prodId', '')
+                    po_sl_no = product.get('poSlNo', '')
                     is_kit = prod_code.startswith('KIT')
+                    is_kit_component = po_sl_no and '.' in po_sl_no  # Kit components have po_sl_no like "2.1", "2.2"
                     
-                    if is_kit:
-                        logger.info(f"Processing kit product: {prod_code}")
-                        unit_price = 0  # Kit products don't have individual unit prices
+                    if is_kit or is_kit_component:
+                        logger.info(f"Processing {'kit component' if is_kit_component else 'kit product'}: {prod_code}")
+                        unit_price = 0  # Kit products and components don't have individual unit prices
                     else:
                         logger.info(f"Processing regular product: {prod_code}")
                         unit_price = round_decimal(product.get('unitPrice', 0))
@@ -182,7 +184,7 @@ def submit_form(request):
                         podate=formData.get('poDate'),
                         quote_id=formData.get('quoteId'),
                         quote_date=formData.get('poValidity'),
-                        cust_id=formData.get('customerId'),
+                        cust=CustomerMaster.objects.get(cust_id=formData.get('customerId')),
                         consignee_id=formData.get('consigneeId'),
                         po_sl_no=product.get('poSlNo'),
                         prod_code=prod_code,
@@ -279,7 +281,7 @@ def get_data_po_cust(request):
             po_no = request.GET.get('po_no')
             po_sl_no = request.GET.get('po_sl_no')
             if cust_id and po_no and po_sl_no:
-                data = list(CustomerPurchaseOrder.objects.filter(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no).order_by('po_sl_no').values())
+                data = list(CustomerPurchaseOrder.objects.filter(cust__cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no).order_by('po_sl_no').values())
                 
                 # Check if the main product is a KIT
                 is_kit = False
@@ -378,7 +380,7 @@ def update_purchase_order(request):
                 )
                 
                 # Get the main record for specific updates
-                main_record = CustomerPurchaseOrder.objects.get(cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
+                main_record = CustomerPurchaseOrder.objects.get(cust__cust_id=cust_id, pono=po_no, po_sl_no=po_sl_no)
 
                 # Step 1: Update common columns for ALL related records
                 for record in all_records_to_update:
@@ -413,7 +415,7 @@ def update_purchase_order(request):
 
                     try:
                         # Fetch the kit record to update
-                        kit_record = CustomerPurchaseOrder.objects.get(cust_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
+                        kit_record = CustomerPurchaseOrder.objects.get(cust__cust_id=kit_cust_id, pono=kit_po_no, po_sl_no=kit_po_sl_no)
 
                         # Update the kit record with product-specific values from kitData
                         # Exclude common columns as they're already updated above
@@ -661,14 +663,27 @@ def update_product_details(request):
     
 @csrf_exempt
 def invoice_processing(request):
-    data = json.loads(request.body.decode('utf-8'))
-
-    print("data: ", data)
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        print("data: ", data)
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+        return JsonResponse({"error": "Invalid JSON data"}, status=400)
+    except Exception as e:
+        print(f"Error parsing request data: {e}")
+        return JsonResponse({"error": "Error processing request data"}, status=400)
 
     po_no = data['formData2'].get('poNo').strip()
     cust_id = data['formData2'].get('customerId')
     new_cons_id = data['formData2'].get('newConsigneeName', '')
     contact_name = data['formData2'].get('contactName')
+    location = data['formData2'].get('location', 'HBL')  # Extract location from frontend
+    
+    # Validate location
+    valid_locations = ['HBL', 'ASP']
+    if location not in valid_locations:
+        return JsonResponse({'error': f'Invalid location: {location}. Must be one of: {valid_locations}'}, status=400)
+    
     freight_charges = data['formData2'].get('freightCharges')
     insurance_charges = data['formData2'].get('insuranceCharges')
     other_charges = data['formData2'].get('otherCharges')
@@ -689,13 +704,46 @@ def invoice_processing(request):
     hsn = []
     noOfBatches = []
     batch_coc_quant = dict()
+    
+    # Track kit components for main kit calculation
+    kit_components = {}  # {main_kit_po_sl_no: [component_po_sl_nos]}
+    main_kit_totals = {}  # {main_kit_po_sl_no: total_quantity}
 
     for item in data['formData2']['items']:
-        po_sl_numbers.append(item['poSlNo'])
+        po_sl_no = item['poSlNo']
+        
+        # Process main item (regular product or main kit)
+        po_sl_numbers.append(po_sl_no)
         qty_tobe_del.append(item['quantities'])
         hsn.append(item['hsnSac'])
         noOfBatches.append(item['noOfBatches'])
-        batch_coc_quant[item['poSlNo']] = item['batch_coc_quant']
+        batch_coc_quant[po_sl_no] = item['batch_coc_quant']
+        
+        # Process kit components if present
+        if 'kitComponents' in item and item['kitComponents']:
+            print(f"Processing kit components for main kit {po_sl_no}")
+            for kit_component in item['kitComponents']:
+                component_po_sl_no = kit_component['po_sl_no']  # "2.1", "2.2"
+                print(f"  -> Processing kit component: {component_po_sl_no}")
+                
+                # Add component to processing lists
+                po_sl_numbers.append(component_po_sl_no)
+                qty_tobe_del.append(kit_component['quantity'])
+                hsn.append(kit_component['hsnSac'])
+                noOfBatches.append(1)  # Default for components
+                batch_coc_quant[component_po_sl_no] = {
+                    "batch": [""],
+                    "coc": [""],
+                    "quantity": [kit_component['quantity']]
+                }
+                
+                # Track for main kit calculation
+                main_kit = component_po_sl_no.split('.')[0]
+                if main_kit not in kit_components:
+                    kit_components[main_kit] = []
+                    main_kit_totals[main_kit] = 0
+                kit_components[main_kit].append(component_po_sl_no)
+                print(f"  -> Added {component_po_sl_no} to kit {main_kit}")
     # return JsonResponse({"hsn": hsn, "po_sl_numbers": po_sl_numbers, "qty_tobe_del": qty_tobe_del, "batch_coc_quant": batch_coc_quant })
     # {
     #     "hsn": ["1213", "8569"],
@@ -891,17 +939,216 @@ def invoice_processing(request):
     df_inw['qty_tobe_del'] = df_inw['po_sl_no'].map(qty_dict)
     df_inw['hsn'] = df_inw['po_sl_no'].map(hsn_dict)
 
-    for index, row in df_inw.iterrows():
-        qty_tobe_del = row['qty_tobe_del']
-        qty_balance = row['qty_balance']
-        quantity = row['quantity']
-
-    #   if qty_tobe_del is not None and qty_balance is not None and quantity is not None:
-        if (qty_tobe_del > 0):
-            if (float(qty_tobe_del) > float(qty_balance)) or (float(qty_tobe_del) > float(quantity)):
-                return JsonResponse({"error": "Insufficient Quantity"}, status=400)
-        else:
-            return JsonResponse({"error": "Invalid Quantity"}, status=400)
+    # Calculate actual quantities and validate
+    try:
+        for index, row in df_inw.iterrows():
+            po_sl_no = row['po_sl_no']
+            frontend_qty = row['qty_tobe_del']
+            prod_code = row.get('prod_code', '')
+            
+            # Check if this is a main kit product or kit component
+            is_main_kit = prod_code.startswith('KIT')
+            is_kit_component = po_sl_no and '.' in po_sl_no  # Kit components have po_sl_no like "2.1", "2.2"
+            
+            # Extract numeric value from pack_size (handle cases like '5 Ltr')
+            pack_size_raw = row.get('pack_size', 1) or 1
+            if isinstance(pack_size_raw, str):
+                import re
+                pack_size_match = re.search(r'(\d+(?:\.\d+)?)', str(pack_size_raw))
+                if pack_size_match:
+                    pack_size = float(pack_size_match.group(1))
+                else:
+                    pack_size = 1.0  # Default to 1 if no numeric value found
+            else:
+                pack_size = float(pack_size_raw)
+            
+            # For main kit products and kit components, set pack_size to 1 to avoid multiplication issues
+            if is_main_kit or is_kit_component:
+                pack_size = 1.0
+                print(f"{'Kit component' if is_kit_component else 'Main kit product'} detected for {po_sl_no}, setting pack_size to 1.0")
+            
+            qty_balance = row['qty_balance']
+            quantity = row['quantity']
+            
+            print(f"Processing {po_sl_no}: frontend_qty={frontend_qty}, pack_size={pack_size}")
+            
+            # Skip validation for special rows (freight, insurance, other charges)
+            if po_sl_no in ['fr', 'ins', 'oc']:
+                print(f"Skipping special row: {po_sl_no}")
+                continue
+            
+            # Handle None or NaN values
+            if frontend_qty is None or pd.isna(frontend_qty):
+                print(f"Invalid quantity for {po_sl_no}: {frontend_qty}")
+                return JsonResponse({"error": f"Invalid quantity for {po_sl_no}: quantity is None or NaN"}, status=400)
+            
+            try:
+                # Extract numeric value from frontend_qty (handle cases like '5 Ltr')
+                if isinstance(frontend_qty, str):
+                    # Try to extract the first number from the string
+                    import re
+                    numeric_match = re.search(r'(\d+(?:\.\d+)?)', str(frontend_qty))
+                    if numeric_match:
+                        frontend_qty = float(numeric_match.group(1))
+                    else:
+                        print(f"Could not extract numeric value from '{frontend_qty}' for {po_sl_no}")
+                        return JsonResponse({"error": f"Could not extract numeric value from quantity '{frontend_qty}' for {po_sl_no}"}, status=400)
+                else:
+                    frontend_qty = float(frontend_qty)
+                
+                # Calculate actual quantity based on product type
+                if is_main_kit or is_kit_component:
+                    # For main kit products and kit components, actual_qty should be the sum of kit components' quantities
+                    # This will be calculated later in the kit component processing section
+                    actual_qty = frontend_qty * pack_size  # This will be overridden later
+                    print(f"Main kit {po_sl_no}: initial actual_qty={actual_qty} (will be updated with sum of kit components)")
+                else:
+                    # For regular products and kit components: frontend_qty * pack_size
+                    actual_qty = frontend_qty * pack_size
+                    print(f"Calculated actual_qty for {po_sl_no}: {actual_qty}")
+                
+                # Update the dataframe with actual quantity
+                df_inw.at[index, 'qty_tobe_del'] = actual_qty
+                
+                # Validate against balance
+                if (actual_qty > 0):
+                    # Extract numeric values from qty_balance and quantity if they are strings
+                    try:
+                        if isinstance(qty_balance, str):
+                            qty_balance_match = re.search(r'(\d+(?:\.\d+)?)', str(qty_balance))
+                            if qty_balance_match:
+                                qty_balance = float(qty_balance_match.group(1))
+                            else:
+                                qty_balance = 0.0
+                        else:
+                            qty_balance = float(qty_balance)
+                        
+                        if isinstance(quantity, str):
+                            quantity_match = re.search(r'(\d+(?:\.\d+)?)', str(quantity))
+                            if quantity_match:
+                                quantity = float(quantity_match.group(1))
+                            else:
+                                quantity = 0.0
+                        else:
+                            quantity = float(quantity)
+                        
+                        if (actual_qty > qty_balance) or (actual_qty > quantity):
+                            return JsonResponse({"error": f"Insufficient Quantity for {po_sl_no}. Requested: {actual_qty}, Available: {qty_balance}"}, status=400)
+                    except (ValueError, TypeError) as e:
+                        print(f"Error converting balance/quantity for {po_sl_no}: {str(e)}")
+                        return JsonResponse({"error": f"Error validating quantities for {po_sl_no}: {str(e)}"}, status=400)
+                else:
+                    return JsonResponse({"error": f"Invalid Quantity for {po_sl_no}"}, status=400)
+                    
+            except (ValueError, TypeError) as e:
+                print(f"Error processing quantity for {po_sl_no}: {str(e)}")
+                return JsonResponse({"error": f"Invalid quantity format for {po_sl_no}: {str(e)}"}, status=400)
+    except Exception as e:
+        print(f"Error in quantity processing loop: {str(e)}")
+        return JsonResponse({"error": f"Error processing quantities: {str(e)}"}, status=500)
+    
+    # Calculate main kit totals from components and add main kits to dataframe
+    if kit_components:  # Only process if there are kit components
+        print(f"Processing kit components: {kit_components}")
+        try:
+            for main_kit_po_sl_no, component_list in kit_components.items():
+                print(f"Processing main kit {main_kit_po_sl_no} with components: {component_list}")
+                total_qty = 0
+                for component_po_sl_no in component_list:
+                    # Find the component in the dataframe
+                    component_row = df_inw[df_inw['po_sl_no'] == component_po_sl_no]
+                    if not component_row.empty:
+                        try:
+                            component_qty_raw = component_row.iloc[0]['qty_tobe_del']
+                            
+                            # Extract numeric value from component_qty (handle cases like '5 Ltr')
+                            if isinstance(component_qty_raw, str):
+                                # Try to extract the first number from the string
+                                import re
+                                numeric_match = re.search(r'(\d+(?:\.\d+)?)', str(component_qty_raw))
+                                if numeric_match:
+                                    component_qty = float(numeric_match.group(1))
+                                else:
+                                    print(f"Could not extract numeric value from '{component_qty_raw}' for kit component {component_po_sl_no}")
+                                    return JsonResponse({"error": f"Could not extract numeric value from quantity '{component_qty_raw}' for kit component {component_po_sl_no}"}, status=400)
+                            else:
+                                component_qty = float(component_qty_raw)
+                            
+                            total_qty += component_qty
+                            print(f"Added component {component_po_sl_no}: {component_qty}, total now: {total_qty}")
+                        except (ValueError, TypeError) as e:
+                            print(f"Error processing kit component {component_po_sl_no}: {str(e)}")
+                            return JsonResponse({"error": f"Invalid quantity for kit component {component_po_sl_no}: {str(e)}"}, status=400)
+                    else:
+                        print(f"Kit component {component_po_sl_no} not found in dataframe")
+                        return JsonResponse({"error": f"Kit component {component_po_sl_no} not found in dataframe"}, status=400)
+                
+                main_kit_totals[main_kit_po_sl_no] = total_qty
+                print(f"Total quantity for main kit {main_kit_po_sl_no}: {total_qty}")
+                
+                # Update the main kit's qty_tobe_del with the sum of kit components
+                main_kit_row = df_inw[df_inw['po_sl_no'] == main_kit_po_sl_no]
+                if not main_kit_row.empty:
+                    # Update existing main kit row with total quantity
+                    main_kit_index = main_kit_row.index[0]
+                    df_inw.at[main_kit_index, 'qty_tobe_del'] = total_qty
+                    print(f"Updated main kit {main_kit_po_sl_no} qty_tobe_del to {total_qty}")
+                else:
+                    # Add main kit to dataframe if not already present
+                    main_kit_db = CustomerPurchaseOrder.objects.filter(
+                        pono=po_no, 
+                        po_sl_no=main_kit_po_sl_no
+                    ).first()
+                    
+                    if main_kit_db:
+                        # Get HSN code for main kit (try to get from components first)
+                        main_kit_hsn = ''
+                        for component_po_sl_no in component_list:
+                            if component_po_sl_no in hsn_dict:
+                                main_kit_hsn = hsn_dict[component_po_sl_no]
+                                break
+                        
+                        # Create main kit row with total quantity
+                        main_kit_data = {
+                            'slno': main_kit_db.slno,
+                            'pono': main_kit_db.pono,
+                            'podate': main_kit_db.podate,
+                            'quote_id': main_kit_db.quote_id,
+                            'quote_date': main_kit_db.quote_date,
+                            'cust_id': main_kit_db.cust.cust_id if main_kit_db.cust else '',
+                            'consignee_id': main_kit_db.consignee_id,
+                            'po_sl_no': main_kit_db.po_sl_no,
+                            'prod_code': main_kit_db.prod_code,
+                            'prod_desc': main_kit_db.prod_desc,
+                            'additional_desc': main_kit_db.additional_desc,
+                            'pack_size': main_kit_db.pack_size,
+                            'quantity': main_kit_db.quantity,
+                            'unit_price': main_kit_db.unit_price,
+                            'uom': main_kit_db.uom,
+                            'hsn_sac': main_kit_db.hsn_sac,
+                            'total_price': main_kit_db.total_price,
+                            'qty_balance': main_kit_db.qty_balance,
+                            'qty_sent': main_kit_db.qty_sent,
+                            'delivery_date': main_kit_db.delivery_date,
+                            'po_validity': main_kit_db.po_validity,
+                            'location': main_kit_db.location,
+                            'qty_tobe_del': total_qty,  # Use calculated total
+                            'hsn': main_kit_hsn
+                        }
+                        
+                        # Add to dataframe
+                        df_inw = pd.concat([df_inw, pd.DataFrame([main_kit_data])], ignore_index=True)
+                        
+                        # Add batch_coc_quant for main kit
+                        batch_coc_quant[main_kit_po_sl_no] = {
+                            "batch": [""],
+                            "coc": [""],
+                            "quantity": [total_qty]
+                        }
+                        noOfBatches.append(1)
+        except Exception as e:
+            print(f"Error in kit component processing: {str(e)}")
+            return JsonResponse({"error": f"Error processing kit components: {str(e)}"}, status=500)
 
     state_code = CustomerMaster.objects.filter(cust_id=cust_id).values_list('cust_st_code', flat=True).first()
     
@@ -918,7 +1165,34 @@ def invoice_processing(request):
     
     # return JsonResponse({"df_inw": df_inw.to_dict()})
     
-    df_inw["taxable_amt"] = (df_inw["qty_tobe_del"].astype(float) * df_inw["unit_price"].astype(float)).round(2)
+    # Helper function to safely convert string quantities to float
+    def safe_float_conversion(value):
+        if pd.isna(value) or value is None:
+            return 0.0
+        if isinstance(value, str):
+            # Try to extract the first number from the string
+            import re
+            numeric_match = re.search(r'(\d+(?:\.\d+)?)', str(value))
+            if numeric_match:
+                return float(numeric_match.group(1))
+            else:
+                return 0.0
+        else:
+            return float(value)
+    
+    # Convert qty_balance and qty_sent to numeric values safely
+    df_inw["qty_balance_numeric"] = df_inw["qty_balance"].apply(safe_float_conversion)
+    df_inw["qty_sent_numeric"] = df_inw["qty_sent"].apply(safe_float_conversion)
+    df_inw["qty_tobe_del_numeric"] = df_inw["qty_tobe_del"].apply(safe_float_conversion)
+    
+    # Calculate new quantities
+    df_inw["qty_sent"] = df_inw["qty_sent_numeric"] + df_inw["qty_tobe_del_numeric"]
+    df_inw["qty_balance"] = df_inw["qty_balance_numeric"] - df_inw["qty_tobe_del_numeric"]
+    
+    # return JsonResponse({"df_inw": df_inw.to_dict()})
+    
+    # Calculate taxable amount after numeric columns are created
+    df_inw["taxable_amt"] = (df_inw["qty_tobe_del_numeric"] * df_inw["unit_price"].astype(float)).round(2)
     
     if gst_exemption:
         if int(state_code) == 29:
@@ -939,10 +1213,6 @@ def invoice_processing(request):
             df_inw["sgst_price"] = 0.0
             df_inw["igst_price"] = (igst_r * df_inw["taxable_amt"].astype(float)).apply(lambda x: f"{x:.2f}")
 
-
-    df_inw["qty_sent"] = df_inw["qty_sent"].astype(float) + df_inw["qty_tobe_del"].astype(float)
-    df_inw["qty_balance"] = df_inw["qty_balance"].astype(float) - df_inw["qty_tobe_del"].astype(float)
-    
     # return JsonResponse({"df_inw": df_inw.to_dict()})
     def create_new_df(df_inw, batch_coc_quant, noOfBatches):
         new_rows = []
@@ -1018,7 +1288,8 @@ def invoice_processing(request):
                 coc=row.get('coc', ''),
                 batch_quantity= row.get('batch_quantity', ''),
                 contact_name=contact_name,
-                contact_number=contact
+                contact_number=contact,
+                location=location  # Add location field from frontend
             )
             OtwDc_instance.save()
             print("successfully added ",row.get('po_sl_no', ''))
@@ -1029,16 +1300,104 @@ def invoice_processing(request):
 
         if index not in skip_index:
             try:
+                # Skip special charge rows for database updates
+                if row['po_sl_no'] in ['fr', 'ins', 'oc']:
+                    continue
+                    
                 record = CustomerPurchaseOrder.objects.get(
                     cust_id=row['cust_id'],
                     pono=row['pono'],
                     po_sl_no=row['po_sl_no']
                 )
-                record.qty_balance = float(record.qty_balance) - float(row['qty_tobe_del'])
-                record.qty_sent = float(record.qty_sent) + float(row["qty_tobe_del"])
-                record.save()
+                
+                # Check if this is a main kit product
+                is_main_kit = record.prod_code.startswith('KIT') if hasattr(record, 'prod_code') else False
+                
+                # Update with actual quantity (already calculated with pack_size)
+                try:
+                    actual_qty = float(row['qty_tobe_del'])
+                    
+                    if is_main_kit:
+                        # For main kit products, skip updating here - will be updated after all components are processed
+                        print(f"Skipping main kit {row['po_sl_no']} update - will be processed after components")
+                        continue
+                    else:
+                        # Regular products and kit components: normal calculation
+                        record.qty_balance = float(record.qty_balance) - actual_qty
+                        record.qty_sent = float(record.qty_sent) + actual_qty
+                        print(f"Updated {row['po_sl_no']}: qty_balance={record.qty_balance}, qty_sent={record.qty_sent}")
+                    
+                    record.save()
+                    
+                except (ValueError, TypeError) as e:
+                    print(f"Error updating quantity for {row['po_sl_no']}: {str(e)}")
+                    continue
+                
             except ObjectDoesNotExist:
-                return JsonResponse({"error": f"Record with cust_id={row['cust_id']}, po_sl_no={row['po_sl_no']} does not exist."}, status=404)
+                print(f"Record not found: cust_id={row['cust_id']}, po_sl_no={row['po_sl_no']}")
+                continue
+            except Exception as e:
+                print(f"Error updating record {row['po_sl_no']}: {str(e)}")
+                continue
+
+    # Now update main kit products after all components have been processed
+    for index, row in df_inw.iterrows():
+        if index in skip_index:
+            continue
+            
+        try:
+            # Skip special charge rows for database updates
+            if row['po_sl_no'] in ['fr', 'ins', 'oc']:
+                continue
+                
+            record = CustomerPurchaseOrder.objects.get(
+                cust_id=row['cust_id'],
+                pono=row['pono'],
+                po_sl_no=row['po_sl_no']
+            )
+            
+            # Check if this is a main kit product
+            is_main_kit = record.prod_code.startswith('KIT') if hasattr(record, 'prod_code') else False
+            
+            if is_main_kit:
+                # For main kit products, calculate qty_sent and qty_balance based on kit components
+                main_kit_po_sl_no = row['po_sl_no']
+                if main_kit_po_sl_no in kit_components:
+                    component_list = kit_components[main_kit_po_sl_no]
+                    kit_components_qty_sent_sum = 0
+                    
+                    # Calculate sum of kit components' qty_sent (after they've been updated)
+                    for component_po_sl_no in component_list:
+                        try:
+                            component_record = CustomerPurchaseOrder.objects.get(
+                                cust_id=row['cust_id'],
+                                pono=row['pono'],
+                                po_sl_no=component_po_sl_no
+                            )
+                            kit_components_qty_sent_sum += float(component_record.qty_sent)
+                        except ObjectDoesNotExist:
+                            print(f"Kit component record not found: {component_po_sl_no}")
+                            continue
+                    
+                    # Update main kit with sum of kit components' qty_sent
+                    record.qty_sent = kit_components_qty_sent_sum
+                    record.qty_balance = float(record.qty_balance) - kit_components_qty_sent_sum
+                    print(f"Updated main kit {row['po_sl_no']}: qty_balance={record.qty_balance}, qty_sent={record.qty_sent}")
+                    record.save()
+                else:
+                    # Fallback to regular calculation if no kit components found
+                    actual_qty = float(row['qty_tobe_del'])
+                    record.qty_balance = float(record.qty_balance) - actual_qty
+                    record.qty_sent = float(record.qty_sent) + actual_qty
+                    print(f"Updated {row['po_sl_no']}: qty_balance={record.qty_balance}, qty_sent={record.qty_sent}")
+                    record.save()
+                
+        except ObjectDoesNotExist:
+            print(f"Record not found: cust_id={row['cust_id']}, po_sl_no={row['po_sl_no']}")
+            continue
+        except Exception as e:
+            print(f"Error updating record {row['po_sl_no']}: {str(e)}")
+            continue
 
     GstRates.objects.filter(id=1).update(last_gcn_no=new_gcn_no)
 
@@ -1065,13 +1424,28 @@ def invoice_generation(request):
             return JsonResponse({"error": "No records found for the provided GCN number"}, status=404)
 
         def model_to_dic(instance):
-            return {
+            # Calculate number of packs by dividing qty_delivered by pack_size (extract numeric part)
+            number_of_packs = 0
+            try:
+                qty_delivered = float(instance.qty_delivered) if instance.qty_delivered else 0
+                import re
+                pack_size_str = str(instance.pack_size) if instance.pack_size else "1"
+                match = re.search(r"(\d+(?:\.\d+)?)", pack_size_str)
+                pack_size = float(match.group(1)) if match else 1.0
+                if pack_size > 0:
+                    number_of_packs = qty_delivered / pack_size
+                else:
+                    number_of_packs = qty_delivered
+            except (ValueError, TypeError):
+                number_of_packs = 0
+
+            result = {
                 'sl_no': instance.sl_no,
                 'gcn_no': instance.gcn_no,
                 'gcn_date': str(instance.gcn_date),
                 'po_no': instance.po_no,
                 'po_date': str(instance.po_date),
-                'cust_id': instance.cust_id,
+                'cust_id': instance.cust.cust_id if instance.cust else '',
                 'consignee_id': instance.consignee_id,
                 'prod_id': instance.prod_id,
                 'po_sl_no': instance.po_sl_no,
@@ -1081,6 +1455,7 @@ def invoice_generation(request):
                 'batch': instance.batch,
                 'coc': instance.coc,
                 'qty_delivered': instance.qty_delivered,
+                'number_of_packs': round(number_of_packs, 2),  # Add number of packs field
                 'pack_size': instance.pack_size,
                 'unit_price': instance.unit_price,
                 'taxable_amt': instance.taxable_amt,
@@ -1088,8 +1463,11 @@ def invoice_generation(request):
                 'sgst_price': instance.sgst_price,
                 'igst_price': instance.igst_price,
                 'contact_name': instance.contact_name,
-                'batch_quantity': instance.batch_quantity
+                'batch_quantity': instance.batch_quantity,
+                'location': instance.location  # Add location to response
             }
+            print(f"Debug - {instance.po_sl_no}: qty_delivered={instance.qty_delivered}, pack_size={instance.pack_size}, number_of_packs={round(number_of_packs, 2)}")
+            return result
 
         otwdc_result = [model_to_dic(otwdc_value) for otwdc_value in otwdc_values]
 
@@ -1100,17 +1478,50 @@ def invoice_generation(request):
                 unique_po_sl_no[item['po_sl_no']] = item
 
         inv_result = list(unique_po_sl_no.values())
+        
+        # Ensure inv_result also has number_of_packs field
+        for inv_item in inv_result:
+            # Find corresponding item in otwdc_result to get number_of_packs
+            for otwdc_item in otwdc_result:
+                if otwdc_item['po_sl_no'] == inv_item['po_sl_no']:
+                    inv_item['number_of_packs'] = otwdc_item.get('number_of_packs', 0)
+                    print(f"Debug - Added number_of_packs to inv_result for {inv_item['po_sl_no']}: {otwdc_item.get('number_of_packs', 0)}")
+                    break
+        
+        # For main kit products, calculate number_of_packs as sum of kit components
+        for inv_item in inv_result:
+            # Check if this is a main kit product (po_sl_no doesn't contain a dot)
+            po_sl_no = inv_item['po_sl_no']
+            if '.' not in po_sl_no and po_sl_no not in ['fr', 'ins', 'oc']:
+                # Find all kit components for this main kit (po_sl_no with dots)
+                kit_components_number_of_packs_sum = 0
+                for otwdc_item in otwdc_result:
+                    if otwdc_item['po_sl_no'].startswith(po_sl_no + '.') or otwdc_item['po_sl_no'] == po_sl_no + '.1' or otwdc_item['po_sl_no'] == po_sl_no + '.2':
+                        kit_components_number_of_packs_sum += otwdc_item.get('number_of_packs', 0)
+                
+                # Update main kit with sum of kit components' number_of_packs
+                if kit_components_number_of_packs_sum > 0:
+                    inv_item['number_of_packs'] = kit_components_number_of_packs_sum
+                    print(f"Debug - Updated main kit {po_sl_no} number_of_packs to sum of components: {kit_components_number_of_packs_sum}")
+            
+            # Ensure kit components have unit_price = 0
+            if '.' in po_sl_no:
+                inv_item['unit_price'] = 0
+                inv_item['taxable_amt'] = 0
+                print(f"Debug - Set unit_price and taxable_amt to 0 for kit component {po_sl_no}")
+        
         odc1 = otwdc_values.first()
 
         # Filter out unwanted po_sl_no
         unwanted_po_sl_no = ("fr", "ins", "oc")
         final_otwdc = [otwdc for otwdc in otwdc_result if otwdc['po_sl_no'] not in unwanted_po_sl_no]
 
-        r = get_object_or_404(CustomerMaster, cust_id=odc1.cust_id)
+        r = get_object_or_404(CustomerMaster, cust_id=odc1.cust.cust_id if odc1.cust else '')
         c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
         gst_rate = get_object_or_404(GstRates, id=1)
 
-        total_qty = otwdc_values.aggregate(total_qty=Sum('qty_delivered'))['total_qty'] or 0
+        # Calculate total number of packs instead of total quantity
+        total_number_of_packs = sum(item.get('number_of_packs', 0) for item in final_otwdc)
         total_taxable_value = sum(item['taxable_amt'] for item in inv_result)
         total_cgst = sum(item['cgst_price'] for item in inv_result)
         total_sgst = sum(item['sgst_price'] for item in inv_result)
@@ -1133,8 +1544,21 @@ def invoice_generation(request):
             'total_sgst': "{:.2f}".format(total_sgst),
             'total_igst': "{:.2f}".format(total_igst),
             'gt': gt,
-            'total_qty': total_qty
+            'total_qty': total_number_of_packs  # Use total number of packs instead of total quantity
         }
+        
+        # Debug: Print the first item to see if number_of_packs is included
+        if final_otwdc:
+            print(f"Debug - First item in final_otwdc: {final_otwdc[0]}")
+            print(f"Debug - number_of_packs: {final_otwdc[0].get('number_of_packs')}")
+            print(f"Debug - qty_delivered: {final_otwdc[0].get('qty_delivered')}")
+        
+        # Debug: Print inv_result structure
+        if inv_result:
+            print(f"Debug - First item in inv_result: {inv_result[0]}")
+            print(f"Debug - inv_result number_of_packs: {inv_result[0].get('number_of_packs')}")
+            print(f"Debug - inv_result qty_delivered: {inv_result[0].get('qty_delivered')}")
+        
         return JsonResponse({"message": "success", "inv_result": inv_result, "context": context}, safe=False)
     else:
         return JsonResponse({"error": "Only GET requests are allowed"}, status=405)
@@ -1178,7 +1602,7 @@ def get_invoice_data(request):
                     
                 print('contact: ', contact_names)
                 
-                cust_id = result_first.cust_id
+                cust_id = result_first.cust.cust_id if result_first.cust else ''
                 consignee_id = result_first.consignee_id
                 invoice_header_data = {
                     'customerId': cust_id,
@@ -1197,7 +1621,10 @@ def get_invoice_data(request):
                         'unit_price': item['unit_price'],
                         'prod_code': item['prod_code'],
                         'prod_desc': item['prod_desc'], 
-                        'hsnSac': item['hsn_sac']
+                        'hsnSac': item['hsn_sac'],
+                        'qty_balance': item['qty_balance'],
+                        'pack_size': item.get('pack_size', ''),
+                        'location': item.get('location', 'HBL')
                     }
                     for item in result_data
                 ]
@@ -1672,7 +2099,7 @@ def outstanding_PO(request):
 
             # If cust_id is provided, add it to the filter conditions
             if cust_id:
-                filter_conditions['cust_id'] = cust_id
+                filter_conditions['cust__cust_id'] = cust_id
 
             # Filter the data based on the conditions
             purchase_orders = CustomerPurchaseOrder.objects.filter(**filter_conditions)
@@ -1693,7 +2120,7 @@ def outstanding_PO(request):
 
                 data.append({
                     'Sl. No.': index,  # Keep as integer
-                    'Cust ID': po.cust_id,
+                    'Cust ID': po.cust.cust_id if po.cust else '',
                     'Customer Name': po.cust.cust_name,
                     'PO No.': po.pono,
                     'PO Date': po.podate.strftime('%d-%m-%Y'),

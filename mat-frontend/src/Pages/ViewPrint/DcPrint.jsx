@@ -1,10 +1,10 @@
 import React, { useState, useRef } from "react"
 import "./InvoicePrint.css"
 import { useReactToPrint } from "react-to-print"
-import Invoice from "../../components/Invoice/Invoice"
+import DcPrint from "../../components/DC/Dc.jsx"
 import api from "../../api/api"
 
-export default function InvoiceReport() {
+export default function DcReport() {
   const [formData, setFormData] = useState({
     invoiceNumber: "",
     year: "2024-25",
@@ -27,18 +27,9 @@ export default function InvoiceReport() {
 
   console.log("formdata: ", formData)
 
-  // const generateGcnNumber = (gst_rate, fin_year, fyear) => {
-  //   const padWithZeros = (number, length) => {
-  //     return number.toString().padStart(length, "0")
-  //   }
-
-  //   const gcn_no = formData.invoiceNumber
-  //   return `${padWithZeros(gcn_no, 3)}/${formData.year}`
-  // }
-
-  const InvoiceC = React.forwardRef((props, ref) => (
-    <div ref={ref} className="invoice-container-container">
-      <Invoice ref={ref} formData={responseData} />
+  const DcReportComponent = React.forwardRef((props, ref) => (
+    <div ref={ref} className="dc-container-container">
+      <DcPrint formData={props.formData} />
     </div>
   ))
 
@@ -48,6 +39,7 @@ export default function InvoiceReport() {
       .get("/invoiceGeneration", {
         params: {
           gcn_no: formData.invoiceNumber,
+          year: formData.year,
         },
       })
       .then((response) => {
@@ -60,7 +52,7 @@ export default function InvoiceReport() {
   }
 
   return (
-    <div className="invoice-report-container">
+    <div className="dc-report-container">
       <div className="input-details-container">
         <h3>Delivery Challan:</h3>
         <form onSubmit={handleSubmit} className="input-details-form">
@@ -94,7 +86,7 @@ export default function InvoiceReport() {
 
         {responseData && (
           <>
-            <DcPrint formData={responseData} />
+            <DcReportComponent formData={responseData} />
             <div>
               <button onClick={handlePrint}>Print this out!</button>
             </div>

@@ -13,10 +13,16 @@ export default function PrintInvoice() {
   const { gcn_no } = location.state
 
   useEffect(() => {
+    // Get current year in YYYY-YY format (e.g., 2024-25)
+    const currentYear = new Date().getFullYear()
+    const nextYear = currentYear + 1
+    const year = `${currentYear}-${nextYear.toString().slice(-2)}`
+
     api
       .get("/invoiceGeneration", {
         params: {
           gcn_no: gcn_no,
+          year: year,
         },
       })
       .then((response) => {
@@ -37,7 +43,7 @@ export default function PrintInvoice() {
 
   const InvoiceC = React.forwardRef((props, ref) => (
     <div ref={ref} className="invoice-container-container">
-      <Invoice ref={ref} formData={formData} />
+      <Invoice formData={formData} />
     </div>
   ))
 

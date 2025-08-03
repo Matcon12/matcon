@@ -99,6 +99,245 @@
   }
 } */
 
+/* Kit Components Styles */
+.kit-components-section {
+  margin-top: 20px;
+  padding: 15px;
+  border: 2px solid #e3f2fd;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.kit-components-header {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #2196f3;
+}
+
+.kit-components-header h4 {
+  color: #1976d2;
+  margin: 0 0 5px 0;
+  font-size: 1.1em;
+}
+
+.kit-info {
+  color: #666;
+  margin: 0;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.batch-count-input {
+  margin-top: 10px;
+  position: relative;
+  display: inline-block;
+  width: 200px;
+}
+
+.batch-count-input input {
+  width: 100%;
+  padding: 8px 12px 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: white;
+  transition: border-color 0.2s ease;
+}
+
+.batch-count-input input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.batch-count-input label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.batch-count-input input:focus + label,
+.batch-count-input input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.kit-components-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.kit-component-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.kit-component-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.kit-component-header strong {
+  color: #1976d2;
+}
+
+.kit-component-details {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 15px;
+  align-items: center;
+}
+
+.kit-component-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kit-component-info span {
+  font-size: 0.85em;
+  color: #666;
+}
+
+.kit-component-balance {
+  font-size: 0.85em;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.kit-component-balance.low-stock {
+  color: #f44336;
+}
+
+.kit-component-balance.medium-stock {
+  color: #ff9800;
+}
+
+.kit-component-balance.high-stock {
+  color: #4caf50;
+}
+
+.remaining-balance {
+  font-size: 0.8em;
+  color: #666;
+  font-weight: normal;
+}
+
+.kit-component-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 300px;
+}
+
+.kit-component-hsn,
+.kit-component-quantity {
+  position: relative;
+  display: block;
+}
+
+.kit-component-hsn input,
+.kit-component-quantity input {
+  width: 100%;
+  padding: 12px 12px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: transparent;
+  transition: border-color 0.2s ease;
+}
+
+.kit-component-hsn input:focus,
+.kit-component-quantity input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.kit-component-hsn label,
+.kit-component-quantity label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.kit-component-hsn input:focus + label,
+.kit-component-hsn input.has-value + label,
+.kit-component-quantity input:focus + label,
+.kit-component-quantity input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+/* Responsive design for kit components */
+@media (max-width: 768px) {
+  .kit-component-details {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kit-component-fields {
+    grid-template-columns: 1fr;
+    min-width: auto;
+  }
+
+  .kit-component-hsn,
+  .kit-component-quantity {
+    min-width: auto;
+  }
+}
+
+/* Responsive design for entry containers */
+@media (max-width: 768px) {
+  .product-inputs {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .entry-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .entry-content {
+    padding: 15px;
+  }
+}
+
 .input-container-contact,
 .autocomplete-wrapper-invoice {
   width: 300px;
@@ -124,6 +363,120 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Entry Container Styles */
+.entry-container {
+  margin: 20px 0;
+  border: 2px solid #e3f2fd;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  overflow: hidden;
+}
+
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #1976d2;
+  color: white;
+}
+
+.entry-title h3 {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.entry-subtitle {
+  margin: 5px 0 0 0;
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.delete-button {
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.entry-content {
+  padding: 20px;
+}
+
+.product-selection-section {
+  margin-bottom: 20px;
+}
+
+.product-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-field {
+  position: relative;
+}
+
+.info-field input {
+  width: 100%;
+  padding: 12px 12px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: white;
+  transition: border-color 0.2s ease;
+}
+
+.info-field input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.info-field label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.info-field input:focus + label,
+.info-field input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
 }
 
 .individual-container {

@@ -9,6 +9,9 @@ export default function POTable({
   poTableKitChanges,
 }) {
   console.log("po_data ", po_data, poTableKitChanges)
+  console.log("Debug - First item in po_data:", po_data[0])
+  console.log("Debug - All po_data keys:", Object.keys(po_data[0] || {}))
+
   const calculateTotal = (qty, price) => {
     const quantity = parseFloat(qty)
     const unitPrice = parseFloat(price)
@@ -20,7 +23,11 @@ export default function POTable({
 
   const calculateTotalQuantity = po_data
     .filter((item) => item.po_no)
-    .reduce((sum, item) => sum + parseFloat(item.qty_delivered), 0)
+    .reduce(
+      (sum, item) =>
+        sum + parseFloat(item.number_of_packs || item.qty_delivered),
+      0
+    )
 
   function stripUnits(value) {
     const numericValue = parseFloat(value.replace(/[^\d.-]/g, ""))
@@ -37,18 +44,34 @@ export default function POTable({
             Description of Goods
           </th>
           <th className="col3">PO Sl.#</th>
-          <th className="col4" style={{ textAlign: "center" }}>HSN Code</th>
-          <th className="col5" style={{ textAlign: "center" }}>QTY</th>
-          <th className="col15" style={{ textAlign: "center" }}>UoM</th>
+          <th className="col4" style={{ textAlign: "center" }}>
+            HSN Code
+          </th>
+          <th className="col5" style={{ textAlign: "center" }}>
+            QTY
+          </th>
+          <th className="col15" style={{ textAlign: "center" }}>
+            UoM
+          </th>
           {/* <th className="col6">Pk Sz/UOM</th> */}
-          <th className="col7" style={{ textAlign: "center" }}>Unit Price</th>
-          <th className="col8" style={{ textAlign: "center" }}>Taxable Amount</th>
+          <th className="col7" style={{ textAlign: "center" }}>
+            Unit Price
+          </th>
+          <th className="col8" style={{ textAlign: "center" }}>
+            Taxable Amount
+          </th>
           {/* <th className="col9">CGST Rate (%)</th> */}
-          <th className="col10" style={{ textAlign: "center" }}>CGST @{gr.cgst_rate}%</th>
+          <th className="col10" style={{ textAlign: "center" }}>
+            CGST @{gr.cgst_rate}%
+          </th>
           {/* <th className="col11">SGST Rate (%)</th> */}
-          <th className="col12" style={{ textAlign: "center" }}>SGST @{gr.sgst_rate}%</th>
+          <th className="col12" style={{ textAlign: "center" }}>
+            SGST @{gr.sgst_rate}%
+          </th>
           {/* <th className="col13">IGST Rate (%)</th> */}
-          <th className="col14" style={{ textAlign: "center" }}>IGST @{gr.igst_rate}%</th>
+          <th className="col14" style={{ textAlign: "center" }}>
+            IGST @{gr.igst_rate}%
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -71,6 +94,13 @@ export default function POTable({
         </tr>
         {po_data.map((data, index) => {
           const { numericValue: packSize, unit } = stripUnits(data.pack_size)
+          console.log(`Debug - Item ${index}:`, {
+            po_sl_no: data.po_sl_no,
+            qty_delivered: data.qty_delivered,
+            number_of_packs: data.number_of_packs,
+            pack_size: data.pack_size,
+            displayed_qty: data.number_of_packs || data.qty_delivered,
+          })
           return (
             <tr key={index}>
               <td className="col1">{index + 1}</td>
@@ -90,7 +120,7 @@ export default function POTable({
                   data.prod_desc !== "Insurance Charges" &&
                   data.prod_desc !==
                     "Packing forwarding with Freight charges" &&
-                  data.qty_delivered}
+                  (data.number_of_packs || data.qty_delivered)}
               </td>
               <td className="col6">{unit}</td>
               <td className="col7">{data.unit_price.toFixed(2)}</td>

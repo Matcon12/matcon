@@ -18,19 +18,31 @@ export default function AutoCompleteComponent({
   handleArrayChange,
 }) {
   const [isFocused, setIsFocused] = useState(false)
+  const [localFilteredData, setLocalFilteredData] = useState([])
 
   useEffect(() => {
-    setFilteredData(data)
-  }, [data, setFilteredData])
+    setLocalFilteredData(data)
+  }, [data])
 
   const getFieldByPoSlNo = (poSlNo, field) => {
+    console.log("getFieldByPoSlNo called with:", {
+      poSlNo,
+      field,
+      dataLength: data?.length,
+    })
     const item = data.find((d) => d.po_sl_no === poSlNo)
+    console.log("Found item:", item)
     return item ? item[field] : ""
   }
 
   const getKitProducts = (poSlNo) => {
+    console.log("getKitProducts called with poSlNo:", poSlNo)
+    console.log("Available data:", data)
     const prefix = poSlNo + "."
-    return data.filter((item) => item.po_sl_no.startsWith(prefix))
+    console.log("Looking for prefix:", prefix)
+    const kitProducts = data.filter((item) => item.po_sl_no.startsWith(prefix))
+    console.log("Found kit products:", kitProducts)
+    return kitProducts
   }
 
   const updateMainField = (name, value) => {
@@ -49,23 +61,37 @@ export default function AutoCompleteComponent({
   }
 
   const filterSuggestions = (value) => {
+    console.log("filterSuggestions called with value:", value)
+    console.log("Available data for filtering:", data)
+    console.log("search_value:", search_value)
+
     if (!data || data.length === 0) {
+      console.log("No data available for filtering")
       return []
     }
 
     const filtered = data.filter((item) => {
       const searchValue = item[search_value]
+      console.log("Checking item:", item, "searchValue:", searchValue)
       if (!searchValue) return false
-      return searchValue.toLowerCase().includes(value.toLowerCase())
+      const matches = searchValue.toLowerCase().includes(value.toLowerCase())
+      console.log("Matches:", matches)
+      return matches
     })
 
+    console.log("Filtered results:", filtered)
     return filtered
   }
 
   const handleSpecialChange = (name, value) => {
+    console.log("handleSpecialChange called with:", { name, value, index })
+
     if (name === "poSlNo") {
       const fieldData = getFieldByPoSlNo(value, "prod_code")
       const kitProducts = getKitProducts(value)
+
+      console.log("fieldData found:", fieldData)
+      console.log("kitProducts found:", kitProducts)
 
       const updated = mainData.map((item, idx) =>
         idx === index
@@ -94,6 +120,8 @@ export default function AutoCompleteComponent({
             }
           : item
       )
+
+      console.log("Updated mainData:", updated)
       setMainData(updated)
     } else if (name === "prod_code" || name === "prodId") {
       const updated = mainData.map((item, idx) =>
@@ -110,29 +138,47 @@ export default function AutoCompleteComponent({
 
   const handleChange = (e) => {
     const { value } = e.target
+    console.log("handleChange called with:", {
+      value,
+      name,
+      array,
+      index,
+      handleArrayChange: !!handleArrayChange,
+    })
 
     // Call handleArrayChange if provided (for custom handling)
     if (handleArrayChange) {
+      console.log("Calling handleArrayChange")
       handleArrayChange(e)
     } else if (
       (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
       array &&
       index !== undefined
     ) {
+      console.log("Calling handleSpecialChange")
       handleSpecialChange(name, value)
     } else if (array && nested) {
+      console.log("Calling updateNestedArrayField")
       updateNestedArrayField(name, value)
     } else {
+      console.log("Calling updateMainField")
       updateMainField(name, value)
     }
 
     const filtered = filterSuggestions(value)
-    setFilteredData(filtered)
+    setLocalFilteredData(filtered)
     if (setPoSlNo) setPoSlNo(e.target)
   }
 
   const handleSuggestionClick = (suggestion) => {
     const value = suggestion[search_value]
+    console.log("handleSuggestionClick called with:", {
+      suggestion,
+      value,
+      name,
+      array,
+      index,
+    })
 
     // Create a synthetic event for handleArrayChange
     const syntheticEvent = {
@@ -144,21 +190,25 @@ export default function AutoCompleteComponent({
 
     // Call handleArrayChange if provided (for custom handling)
     if (handleArrayChange) {
+      console.log("Calling handleArrayChange from suggestion click")
       handleArrayChange(syntheticEvent)
     } else if (
       (name === "poSlNo" || name === "prod_code" || name === "prodId") &&
       array &&
       index !== undefined
     ) {
+      console.log("Calling handleSpecialChange from suggestion click")
       handleSpecialChange(name, value)
     } else if (array && nested) {
+      console.log("Calling updateNestedArrayField from suggestion click")
       updateNestedArrayField(name, value)
     } else {
+      console.log("Calling updateMainField from suggestion click")
       updateMainField(name, value)
     }
 
     setIsFocused(false)
-    setFilteredData([])
+    setLocalFilteredData([])
   }
 
   const handleFocus = () => {
@@ -186,9 +236,9 @@ export default function AutoCompleteComponent({
         readOnly={readonly}
       />
       <label alt="" placeholder={placeholder}></label>
-      {isFocused && filteredData?.length > 0 && (
+      {isFocused && localFilteredData?.length > 0 && (
         <ul id="autocomplete-list" className="suggestions-list">
-          {filteredData.map((suggestion, i) => (
+          {localFilteredData.map((suggestion, i) => (
             <li key={i} onMouseDown={() => handleSuggestionClick(suggestion)}>
               {suggestion[search_value]}
             </li>

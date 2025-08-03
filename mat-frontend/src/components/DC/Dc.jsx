@@ -163,14 +163,18 @@ function DcReportC({ formData }) {
           <tbody>
             {groupedData.map((group, groupIndex) => {
               return group.items.map((data, index) => {
-                const { numericValue: batch_quantity } = stripUnits(
-                  data.batch_quantity
-                )
                 const { numericValue: packSize, unit } = stripUnits(
                   data.pack_size
                 )
-                // const totalQty = batch_quantity * packSize
-                const totalQty = batch_quantity / packSize
+
+                console.log(`Debug - DC Item ${data.po_sl_no}:`, {
+                  po_sl_no: data.po_sl_no,
+                  number_of_packs: data.number_of_packs,
+                  pack_size: data.pack_size,
+                  qty_delivered: data.qty_delivered,
+                  displayed_no_of_packs: data.number_of_packs || 0,
+                  displayed_total_qty: data.qty_delivered,
+                })
 
                 return (
                   <tr key={groupIndex + "-" + index}>
@@ -181,9 +185,9 @@ function DcReportC({ formData }) {
                       </>
                     )}
                     <td className="a-right">{data.po_sl_no}</td>
-                    <td className="a-right">{totalQty}</td>
+                    <td className="a-right">{data.number_of_packs || 0}</td>
                     <td className="a-right">{data.pack_size}</td>
-                    <td className="a-right">{data.batch_quantity}</td>
+                    <td className="a-right">{data.qty_delivered}</td>
                     <td>{unit}</td>
                     <td className="a-right">{data.batch}</td>
                     {/* <td>{data.coc}</td> */}

@@ -23,6 +23,7 @@ export default function Invoice() {
     customerData: [],
     totalEntries: "",
     contactName: "",
+    location: "",
     freight: false,
     insurance: false,
     freightCharges: "",
@@ -37,11 +38,8 @@ export default function Invoice() {
   const [entries, setEntries] = useState([])
   const [show, setShow] = useState(false)
   const [purchaseOrder, setPurchaseOrder] = useState([])
-  const [filteredPurchaseData, setFilteredPurchaseData] = useState([])
-  // const [contactName, setContactName] = useState("")
   const [contactOptions, setContactOptions] = useState([])
   const [customerData, setCustomerData] = useState([])
-  const [filteredCustomerData, setFilteredCustomerData] = useState([])
   const [purchaseOrderDetails, setPurchaseOrderDetails] = useState([])
   const [poSlNo, setPoSlNo] = useState("")
 
@@ -49,10 +47,15 @@ export default function Invoice() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      [name]: value,
-    }))
+    console.log("handleInputChange called:", { name, value })
+    setFormData((prevFormData) => {
+      const newFormData = {
+        ...prevFormData,
+        [name]: value,
+      }
+      console.log("Updated formData:", newFormData)
+      return newFormData
+    })
   }
 
   const handleOtherChargesChange = (e) => {
@@ -79,7 +82,7 @@ export default function Invoice() {
   useEffect(() => {
     //get list of all the purchase order numbers for the autocomplete dropdown
     api.get("/getPurchaseOrder").then((response) => {
-      console.log(response)
+      console.log("Purchase order response:", response.data)
       setPurchaseOrder(response.data.distinct_pono)
     })
 
@@ -89,65 +92,250 @@ export default function Invoice() {
     })
   }, [])
 
+  useEffect(() => {
+    console.log("Entries state updated:", entries)
+  }, [entries])
+
+  useEffect(() => {
+    console.log("PurchaseOrderDetails updated:", purchaseOrderDetails)
+  }, [purchaseOrderDetails])
+
+  useEffect(() => {
+    // Log entries that have kit products
+    const kitEntries = entries.filter(
+      (entry) => entry.isKit && entry.kitData && entry.kitData.length > 0
+    )
+    if (kitEntries.length > 0) {
+      console.log("Kit entries found:", kitEntries)
+    }
+  }, [entries])
+
+  useEffect(() => {
+    // Set initial has-value class for kit component inputs
+    setTimeout(() => {
+      const kitInputs = document.querySelectorAll(
+        ".kit-component-hsn input, .kit-component-quantity input"
+      )
+      kitInputs.forEach((input) => {
+        if (input.value && input.value.trim() !== "") {
+          input.classList.add("has-value")
+        } else {
+          input.classList.remove("has-value")
+        }
+      })
+    }, 100) // Small delay to ensure DOM is updated
+  }, [entries])
+
+  useEffect(() => {
+    api
+      .get("/getInvoiceData", {
+        params: { poNo: formData.poNo },
+      })
+      .then((response) => {
+        console.log("Invoice data response:", response.data)
+        console.log("Location from API:", response.data.result[0]?.location)
+        console.log(
+          "Setting location to:",
+          response.data.result[0]?.location || "HBL"
+        )
+        setFormData((prevFormData) => ({
+          ...prevFormData,
+          customerId: response.data.invoice_header_data.customerId,
+          consigneeId: response.data.invoice_header_data.consigneeId,
+          contactName: response.data.invoice_header_data.contact_names[0],
+          location: response.data.result[0]?.location || "HBL",
+        }))
+        setContactOptions(response.data.invoice_header_data.contact_names)
+        console.log("Setting purchaseOrderDetails:", response.data.result)
+        setPurchaseOrderDetails(response.data.result)
+      })
+      .catch((error) => {
+        // resetForm()
+        console.error(error)
+      })
+  }, [formData.poNo])
+
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    const transformedEntries = entries.map((entry) => {
-      const quantitiesSum = entry.quantities.reduce(
-        (sum, quantity) => sum + Number(quantity),
-        0
-      )
-      return {
-        poSlNo: entry.poSlNo,
-        hsnSac: entry.hsnSac,
-        quantities: quantitiesSum,
-        noOfBatches: entry.noOfBatches,
-        batch_coc_quant: {
-          batch: entry.batches,
-          coc: entry.cocs,
-          quantity: entry.quantities,
-        },
+    try {
+      // Validate kit component quantities
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]
+        if (entry.isKit && entry.kitData && entry.kitData.length > 0) {
+          for (let j = 0; j < entry.kitData.length; j++) {
+            const kitItem = entry.kitData[j]
+            if (!kitItem.quantity || kitItem.quantity <= 0) {
+              toast.error(
+                `Please enter quantity for kit component: ${kitItem.prod_desc}`
+              )
+              return
+            }
+          }
+        }
       }
-    })
 
-    const formData2 = {
-      customerId: formData.customerId,
-      consigneeName: formData.consigneeId,
-      newConsigneeName: formData.newConsigneeId,
-      contactName: formData.contactName,
-      poNo: formData.poNo,
-      items: transformedEntries,
-      freightCharges: formData.freightCharges,
-      insuranceCharges: formData.insuranceCharges,
-      otherCharges: formData.otherCharges,
-    }
+      const transformedEntries = entries.map((entry) => {
+        // For kit products, we don't validate the main product quantity
+        // since quantities are entered for individual kit components
+        if (entry.isKit) {
+          // Validate kit quantity
+          const kitQuantity = Number(entry.kitQuantity || 0)
+          if (kitQuantity <= 0) {
+            throw new Error(
+              `Please enter a valid quantity for kit product ${
+                entry.prod_desc || entry.poSlNo
+              }.`
+            )
+          }
 
-    console.log({ formData2 })
-    api
-      .post(
-        "/invoiceProcessing",
-        {
-          formData2,
+          const baseEntry = {
+            poSlNo: entry.poSlNo,
+            hsnSac: entry.hsnSac,
+            quantities: kitQuantity, // Use the kit quantity
+            noOfBatches: entry.noOfBatches,
+            batch_coc_quant: {
+              batch: entry.batches,
+              coc: entry.cocs,
+              quantity: [kitQuantity.toString()], // Use kit quantity as string in array
+            },
+          }
+
+          // Add kit component data if this is a kit product
+          if (entry.kitData && entry.kitData.length > 0) {
+            baseEntry.kitComponents = entry.kitData.map((kitItem) => ({
+              po_sl_no: kitItem.po_sl_no,
+              prod_desc: kitItem.prod_desc,
+              hsnSac: kitItem.hsnSac || "",
+              unit_price: kitItem.unit_price,
+              quantity: kitItem.quantity || 0,
+            }))
+
+            // For kit products, we don't need batch data since components are handled separately
+            baseEntry.isKitProduct = true
+          }
+
+          return baseEntry
+        }
+
+        // For non-kit products, validate quantities as before
+        const validQuantities = entry.quantities
+          .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+          .map((qty) => Number(qty))
+          .filter((qty) => !isNaN(qty) && qty > 0)
+
+        const quantitiesSum = validQuantities.reduce(
+          (sum, quantity) => sum + quantity,
+          0
+        )
+
+        console.log("Entry quantities:", entry.quantities)
+        console.log("Valid quantities:", validQuantities)
+        console.log("Quantities sum:", quantitiesSum)
+
+        if (quantitiesSum <= 0) {
+          throw new Error(
+            `Invalid quantity for product ${
+              entry.prod_desc || entry.poSlNo
+            }. Please enter valid quantities.`
+          )
+        }
+
+        const baseEntry = {
+          poSlNo: entry.poSlNo,
+          hsnSac: entry.hsnSac,
+          quantities: quantitiesSum,
+          noOfBatches: entry.noOfBatches,
+          batch_coc_quant: {
+            batch: entry.batches,
+            coc: entry.cocs,
+            quantity: entry.quantities,
+          },
+        }
+
+        return baseEntry
+      })
+
+      const formData2 = {
+        customerId: formData.customerId,
+        consigneeName: formData.consigneeId,
+        newConsigneeName: formData.newConsigneeId,
+        contactName: formData.contactName,
+        location: formData.location,
+        poNo: formData.poNo,
+        items: transformedEntries,
+        freightCharges: formData.freightCharges,
+        insuranceCharges: formData.insuranceCharges,
+        otherCharges: formData.otherCharges,
+      }
+
+      console.log("Submitting form data:", { formData2 })
+      console.log("Entries:", entries)
+      console.log("Transformed entries:", transformedEntries)
+      console.log("Location value being sent:", formData.location)
+      console.log("Complete formData state:", formData)
+      console.log("formData2 location field:", formData2.location)
+      console.log("Complete payload structure:", {
+        formData2: {
+          ...formData2,
+          location: formData.location,
         },
-        {
+      })
+      const payload = {
+        formData2,
+      }
+      console.log(
+        "Final payload being sent to API:",
+        JSON.stringify(payload, null, 2)
+      )
+
+      // Verify location is included in the payload
+      if (!payload.formData2.location) {
+        console.error("WARNING: Location field is missing from payload!")
+        console.error("formData.location:", formData.location)
+        console.error("formData2.location:", formData2.location)
+      } else {
+        console.log(
+          "✅ Location field is present in payload:",
+          payload.formData2.location
+        )
+      }
+
+      api
+        .post("/invoiceProcessing", payload, {
           headers: {
             "Content-Type": "application/json",
           },
-        }
-      )
-      .then((response) => {
-        console.log(response.data)
-        navigate("print_invoice", {
-          state: { gcn_no: response.data.gcn_no },
         })
-      })
-      .catch((error) => {
-        console.log(error.response.data.error)
-        toast.error(error.response.data.error)
-      })
+        .then((response) => {
+          console.log(response.data)
+          navigate("print_invoice", {
+            state: { gcn_no: response.data.gcn_no },
+          })
+        })
+        .catch((error) => {
+          console.log("Error response:", error.response)
+          console.log("Error data:", error.response?.data)
+          console.log("Error status:", error.response?.status)
+          if (error.response?.data?.error) {
+            toast.error(error.response.data.error)
+          } else {
+            toast.error("An error occurred while processing the invoice")
+          }
+        })
+    } catch (error) {
+      console.log("Validation error:", error.message)
+      toast.error(error.message)
+    }
   }
 
   const handleChange = (entryIndex, fieldIndex, field, value) => {
+    console.log("Invoice handleChange called with:", {
+      entryIndex,
+      fieldIndex,
+      field,
+      value,
+    })
     const newEntries = [...entries]
     if (field === "noOfBatches") {
       const noOfBatches = Number(value)
@@ -164,10 +352,197 @@ export default function Invoice() {
         { length: noOfBatches },
         (_, i) => newEntries[entryIndex].cocs[i] || ""
       )
+    } else if (fieldIndex === undefined || fieldIndex === null) {
+      // Handle non-array fields like poSlNo, prod_desc, hsnSac
+      newEntries[entryIndex][field] = value
+
+      // If poSlNo is being updated, automatically populate prod_desc and hsnSac
+      if (field === "poSlNo" && value) {
+        console.log("poSlNo selected:", value)
+        console.log("purchaseOrderDetails:", purchaseOrderDetails)
+        console.log(
+          "Sample purchaseOrderDetails item:",
+          purchaseOrderDetails[0]
+        )
+
+        // Find the matching item in purchaseOrderDetails
+        const matchingItem = purchaseOrderDetails.find(
+          (item) => item.po_sl_no === value
+        )
+        console.log("Matching item found:", matchingItem)
+
+        if (matchingItem) {
+          newEntries[entryIndex].prod_desc = matchingItem.prod_desc || ""
+          newEntries[entryIndex].hsnSac = matchingItem.hsnSac || ""
+          newEntries[entryIndex].prod_code = matchingItem.prod_code || ""
+          newEntries[entryIndex].qty_balance = matchingItem.qty_balance || 0
+          newEntries[entryIndex].unit_price = matchingItem.unit_price || 0
+          newEntries[entryIndex].pack_size = matchingItem.pack_size || ""
+
+          // Check if this is a kit product
+          const isKit =
+            matchingItem.prod_code && matchingItem.prod_code.startsWith("KIT")
+          console.log("Is kit product:", isKit)
+
+          let kitProducts = [] // Initialize kitProducts variable
+
+          if (isKit) {
+            // Get kit components (sub-components)
+            kitProducts = purchaseOrderDetails.filter((item) =>
+              item.po_sl_no.startsWith(value + ".")
+            )
+            console.log("Kit products found:", kitProducts)
+            console.log(
+              "All purchaseOrderDetails for kit search:",
+              purchaseOrderDetails.map((item) => ({
+                po_sl_no: item.po_sl_no,
+                prod_desc: item.prod_desc,
+              }))
+            )
+            newEntries[entryIndex].kitData = kitProducts
+            newEntries[entryIndex].isKit = true
+          } else {
+            newEntries[entryIndex].isKit = false
+            newEntries[entryIndex].kitData = []
+          }
+
+          console.log("Auto-populated fields:", {
+            prod_desc: matchingItem.prod_desc,
+            hsnSac: matchingItem.hsnSac,
+            prod_code: matchingItem.prod_code,
+            isKit: isKit,
+            kitProductsCount: isKit ? kitProducts.length : 0,
+          })
+        }
+      }
+
+      console.log("Updated entry:", newEntries[entryIndex])
     } else {
+      // Handle array fields like quantities, batches, cocs
       newEntries[entryIndex][field][fieldIndex] = value
     }
     setEntries(newEntries)
+  }
+
+  const handleKitComponentQuantityChange = (entryIndex, kitIndex, value) => {
+    console.log("Kit component quantity change:", {
+      entryIndex,
+      kitIndex,
+      value,
+    })
+    const newEntries = [...entries]
+
+    if (
+      newEntries[entryIndex].kitData &&
+      newEntries[entryIndex].kitData[kitIndex]
+    ) {
+      const kitItem = newEntries[entryIndex].kitData[kitIndex]
+      const quantity = parseFloat(value) || 0
+      const balance = parseFloat(kitItem.qty_balance) || 0
+      const packSize = parseFloat(kitItem.pack_size) || 1
+      const actualQuantity = quantity * packSize
+
+      if (actualQuantity > balance) {
+        toast.warning(
+          `Quantity cannot exceed available balance. You entered ${quantity} × ${packSize} = ${actualQuantity} units, but only ${balance} units are available.`
+        )
+        return
+      }
+
+      newEntries[entryIndex].kitData[kitIndex] = {
+        ...newEntries[entryIndex].kitData[kitIndex],
+        quantity: value,
+      }
+      setEntries(newEntries)
+    }
+  }
+
+  const handleNonKitQuantityChange = (entryIndex, fieldIndex, value) => {
+    console.log("Non-kit quantity change:", {
+      entryIndex,
+      fieldIndex,
+      value,
+    })
+    const newEntries = [...entries]
+
+    if (newEntries[entryIndex]) {
+      const entry = newEntries[entryIndex]
+      const quantity = parseFloat(value) || 0
+      const balance = parseFloat(entry.qty_balance) || 0
+      const packSize = parseFloat(entry.pack_size) || 1
+      const actualQuantity = quantity * packSize
+
+      if (actualQuantity > balance) {
+        toast.warning(
+          `Quantity cannot exceed available balance. You entered ${quantity} × ${packSize} = ${actualQuantity} units, but only ${balance} units are available.`
+        )
+        return
+      }
+
+      newEntries[entryIndex].quantities[fieldIndex] = value
+      setEntries(newEntries)
+    }
+  }
+
+  const handleKitComponentFieldChange = (
+    entryIndex,
+    kitIndex,
+    field,
+    value
+  ) => {
+    console.log("Kit component field change:", {
+      entryIndex,
+      kitIndex,
+      field,
+      value,
+    })
+    const newEntries = [...entries]
+
+    if (
+      newEntries[entryIndex].kitData &&
+      newEntries[entryIndex].kitData[kitIndex]
+    ) {
+      newEntries[entryIndex].kitData[kitIndex] = {
+        ...newEntries[entryIndex].kitData[kitIndex],
+        [field]: value,
+      }
+      setEntries(newEntries)
+    }
+  }
+
+  const handleKitInputFocus = (e) => {
+    e.target.classList.add("has-value")
+  }
+
+  const handleKitInputBlur = (e) => {
+    if (!e.target.value || e.target.value.trim() === "") {
+      e.target.classList.remove("has-value")
+    } else {
+      e.target.classList.add("has-value")
+    }
+  }
+
+  const getStockLevelClass = (balance) => {
+    const balanceNum = parseFloat(balance) || 0
+    if (balanceNum <= 10) return "low-stock"
+    if (balanceNum <= 50) return "medium-stock"
+    return "high-stock"
+  }
+
+  const getRemainingBalance = (kitItem) => {
+    const balance = parseFloat(kitItem.qty_balance) || 0
+    const quantity = parseFloat(kitItem.quantity) || 0
+    const packSize = parseFloat(kitItem.pack_size) || 1
+    const actualQuantity = quantity * packSize
+    return Math.max(0, balance - actualQuantity)
+  }
+
+  const getNonKitRemainingBalance = (entry, fieldIndex) => {
+    const balance = parseFloat(entry.qty_balance) || 0
+    const quantity = parseFloat(entry.quantities[fieldIndex]) || 0
+    const packSize = parseFloat(entry.pack_size) || 1
+    const actualQuantity = quantity * packSize
+    return Math.max(0, balance - actualQuantity)
   }
 
   const resetForm = () => {
@@ -185,6 +560,9 @@ export default function Invoice() {
           poSlNo: "",
           hsnSac: "",
           prod_desc: "",
+          prod_code: "",
+          isKit: false,
+          kitData: [],
           quantities: [""],
           batches: [""],
           cocs: [""],
@@ -194,28 +572,6 @@ export default function Invoice() {
       toast.warning("Enter PO No.")
     }
   }
-
-  useEffect(() => {
-    api
-      .get("/getInvoiceData", {
-        params: { poNo: formData.poNo },
-      })
-      .then((response) => {
-        console.log(response.data)
-        setFormData((prevFormData) => ({
-          ...prevFormData,
-          customerId: response.data.invoice_header_data.customerId,
-          consigneeId: response.data.invoice_header_data.consigneeId,
-          contactName: response.data.invoice_header_data.contact_names[0],
-        }))
-        setContactOptions(response.data.invoice_header_data.contact_names)
-        setPurchaseOrderDetails(response.data.result)
-      })
-      .catch((error) => {
-        // resetForm()
-        console.error(error)
-      })
-  }, [formData.poNo])
 
   const handleCheckboxChange = (event) => {
     setFormData((prevFormData) => ({
@@ -240,8 +596,6 @@ export default function Invoice() {
               mainData={formData}
               setData={setPurchaseOrder}
               setMainData={setFormData}
-              filteredData={filteredPurchaseData}
-              setFilteredData={setFilteredPurchaseData}
               name="poNo"
               placeholder="Customer PO No."
               search_value="pono"
@@ -279,8 +633,6 @@ export default function Invoice() {
               mainData={formData}
               setData={setCustomerData}
               setMainData={setFormData}
-              filteredData={filteredCustomerData}
-              setFilteredData={setFilteredCustomerData}
               name="newConsigneeId"
               placeholder="New Consignee Id (if required)"
               search_value="cust_id"
@@ -302,6 +654,16 @@ export default function Invoice() {
               ))}
             </select>
             <label alt="Select an Option" placeholder="Contact Name"></label>
+          </div>
+          <div>
+            <input
+              type="text"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              placeholder=" "
+            />
+            <label alt="Enter the Location" placeholder="Location"></label>
           </div>
 
           <div>
@@ -384,187 +746,345 @@ export default function Invoice() {
             <div className="invoice-input-complete-container">
               {Array.isArray(entries) &&
                 entries.map((entry, entryIndex) => (
-                  <div key={entryIndex} className="individual-container">
-                    {/* <div className="batch_number_n_delete"> */}
-                    <div>
-                      <p>Entry {entryIndex + 1}</p>
-                      <div className="clear_current_product">
+                  <div key={entryIndex} className="entry-container">
+                    <div className="entry-header">
+                      <div className="entry-title">
+                        <h3>Entry {entryIndex + 1}</h3>
+                        <p className="entry-subtitle">Product Information</p>
+                      </div>
+                      <div className="entry-actions">
                         <FontAwesomeIcon
-                          className="clearButton"
+                          className="delete-button"
                           icon={faTrash}
                           onClick={() => handleDelete(entryIndex)}
+                          title="Delete Entry"
                         />
                       </div>
                     </div>
-                    {/* </div> */}
-                    <div className="invoice-form-input-container">
-                      <div className="invoice-form-input-only-headers">
-                        <div className="autocomplete-wrapper">
-                          <AutoCompleteUtil
-                            data={purchaseOrderDetails}
-                            mainData={entries}
-                            setData={setPurchaseOrderDetails}
-                            setMainData={setEntries}
-                            filteredData={filteredCustomerData}
-                            handleArrayChange={(e) =>
-                              handleChange(
-                                entryIndex,
-                                undefined,
-                                "poSlNo",
-                                e.target.value
-                              )
-                            }
-                            setFilteredData={setFilteredCustomerData}
-                            name="poSlNo"
-                            placeholder="PO Sl No."
-                            search_value="po_sl_no"
-                            setPoSlNo={setPoSlNo}
-                            array={true}
-                            index={entryIndex}
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="text"
-                            name="prod_desc"
-                            value={entry.prod_desc}
-                            onChange={(e) =>
-                              handleChange(
-                                entryIndex,
-                                null,
-                                "prod_desc",
-                                e.target.value
-                              )
-                            }
-                            placeholder=" "
-                            readOnly
-                          />
-                          <label
-                            alt="Enter the hsn/sac"
-                            placeholder="Product Description"
-                          ></label>
-                        </div>
-                        <div>
-                          <input
-                            type="text"
-                            name="hsnSac"
-                            value={entry.hsnSac}
-                            onChange={(e) =>
-                              handleChange(
-                                entryIndex,
-                                null,
-                                "hsnSac",
-                                e.target.value
-                              )
-                            }
-                            placeholder=" "
-                          />
-                          <label
-                            alt="Enter the hsn/sac"
-                            placeholder="HSN/SAC"
-                          ></label>
-                        </div>
-                        {!(
-                          entry.prodCode && entry.prodCode.startsWith("KIT")
-                        ) && (
-                          <div className="noOfBatches">
-                            <input
-                              type="text"
-                              name="noOfBatches"
-                              value={entry.noOfBatches}
-                              onChange={(e) =>
+
+                    <div className="entry-content">
+                      <div className="product-selection-section">
+                        <div className="product-inputs">
+                          <div className="autocomplete-wrapper">
+                            <AutoCompleteUtil
+                              data={purchaseOrderDetails}
+                              mainData={entries}
+                              setData={setPurchaseOrderDetails}
+                              setMainData={setEntries}
+                              handleArrayChange={(e) =>
                                 handleChange(
                                   entryIndex,
-                                  null,
-                                  "noOfBatches",
+                                  undefined,
+                                  "poSlNo",
                                   e.target.value
                                 )
                               }
-                              placeholder=" "
+                              name="poSlNo"
+                              placeholder="PO Sl No."
+                              search_value="po_sl_no"
+                              setPoSlNo={setPoSlNo}
+                              array={true}
+                              index={entryIndex}
                             />
-                            <label
-                              alt="Enter the number of Batches"
-                              placeholder="Number of Batches"
-                            ></label>
                           </div>
-                        )}
-                      </div>
-                      <div className="individual-batches">
-                        {entry.quantities.map((quantity, fieldIndex) => (
-                          <div>
-                            {!(
-                              entry.prodCode && entry.prodCode.startsWith("KIT")
-                            ) && <p>Batch: {fieldIndex + 1}</p>}
-                            <div className="batch_quant" key={fieldIndex}>
-                              <div>
+                          <div className="product-info">
+                            <div className="info-field">
+                              <input
+                                type="text"
+                                name="prod_desc"
+                                value={entry.prod_desc}
+                                onChange={(e) =>
+                                  handleChange(
+                                    entryIndex,
+                                    null,
+                                    "prod_desc",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder=" "
+                                readOnly
+                              />
+                              <label>Product Description</label>
+                            </div>
+                            <div className="info-field">
+                              <input
+                                type="text"
+                                name="hsnSac"
+                                value={entry.hsnSac}
+                                onChange={(e) =>
+                                  handleChange(
+                                    entryIndex,
+                                    null,
+                                    "hsnSac",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder=" "
+                                onFocus={handleKitInputFocus}
+                                onBlur={handleKitInputBlur}
+                              />
+                              <label>HSN/SAC (Editable)</label>
+                            </div>
+                            {/* Quantity field for kit products */}
+                            {entry.isKit && (
+                              <div className="info-field">
                                 <input
-                                  type="text"
-                                  name={`quantity-${fieldIndex}`}
-                                  value={quantity}
+                                  type="number"
+                                  name="kitQuantity"
+                                  value={entry.kitQuantity || ""}
                                   onChange={(e) =>
                                     handleChange(
                                       entryIndex,
-                                      fieldIndex,
-                                      "quantities",
+                                      null,
+                                      "kitQuantity",
                                       e.target.value
                                     )
                                   }
                                   placeholder=" "
+                                  min="1"
+                                  step="1"
+                                  onFocus={handleKitInputFocus}
+                                  onBlur={handleKitInputBlur}
                                 />
-                                <label
-                                  alt="Enter the quantity"
-                                  placeholder="Quantity"
-                                ></label>
+                                <label>Kit Quantity</label>
                               </div>
-                              {!(
-                                entry.prodCode &&
-                                entry.prodCode.startsWith("KIT")
-                              ) && (
-                                <div>
-                                  <input
-                                    type="text"
-                                    name={`batch-${fieldIndex}`}
-                                    value={entry.batches[fieldIndex]}
-                                    onChange={(e) =>
-                                      handleChange(
-                                        entryIndex,
-                                        fieldIndex,
-                                        "batches",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder=" "
-                                  />
-                                  <label
-                                    alt="Enter the batch no."
-                                    placeholder="Batch No."
-                                  ></label>
-                                </div>
-                              )}
-                              {/* <div>
-                                <input
-                                  type="text"
-                                  name={`coc-${fieldIndex}`}
-                                  value={entry.cocs[fieldIndex]}
-                                  onChange={(e) =>
-                                    handleChange(
-                                      entryIndex,
-                                      fieldIndex,
-                                      "cocs",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder=" "
-                                />
-                                <label
-                                  alt="Enter the COC No."
-                                  placeholder="COC No."
-                                ></label>
-                              </div> */}
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Non-Kit Product Components Section */}
+                      {!(
+                        entry.prod_code && entry.prod_code.startsWith("KIT")
+                      ) && (
+                        <div className="kit-components-section">
+                          <div className="kit-components-header">
+                            <h4>Product Details:</h4>
+                            <p className="kit-info">
+                              Enter quantities and batch details for each batch
+                            </p>
+                            <div className="batch-count-input">
+                              <input
+                                type="number"
+                                name="noOfBatches"
+                                value={entry.noOfBatches}
+                                onChange={(e) =>
+                                  handleChange(
+                                    entryIndex,
+                                    null,
+                                    "noOfBatches",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder=" "
+                                min="1"
+                                max="10"
+                                onFocus={handleKitInputFocus}
+                                onBlur={handleKitInputBlur}
+                              />
+                              <label>Number of Batches</label>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <div className="kit-components-container">
+                            {entry.quantities
+                              .slice(0, entry.noOfBatches || 1)
+                              .map((quantity, fieldIndex) => (
+                                <div
+                                  key={fieldIndex}
+                                  className="kit-component-item"
+                                >
+                                  <div className="kit-component-header">
+                                    <strong>Batch {fieldIndex + 1}:</strong>{" "}
+                                    Product Details
+                                  </div>
+                                  <div className="kit-component-details">
+                                    <div className="kit-component-info">
+                                      <span>Product: {entry.prod_desc}</span>
+                                      <span>HSN/SAC: {entry.hsnSac}</span>
+                                      <span>PO Sl No: {entry.poSlNo}</span>
+                                      <span>
+                                        Pack Size: {entry.pack_size || "N/A"}
+                                      </span>
+                                      <span
+                                        className={`kit-component-balance ${getStockLevelClass(
+                                          entry.qty_balance
+                                        )}`}
+                                      >
+                                        Balance: {entry.qty_balance || 0} units
+                                        {quantity &&
+                                          parseFloat(quantity) > 0 && (
+                                            <span className="remaining-balance">
+                                              {" "}
+                                              (Remaining:{" "}
+                                              {getNonKitRemainingBalance(
+                                                entry,
+                                                fieldIndex
+                                              )}
+                                              )
+                                            </span>
+                                          )}
+                                      </span>
+                                    </div>
+                                    <div className="kit-component-fields">
+                                      <div className="kit-component-hsn">
+                                        <input
+                                          type="text"
+                                          name={`quantity-${fieldIndex}`}
+                                          value={quantity}
+                                          onChange={(e) =>
+                                            handleNonKitQuantityChange(
+                                              entryIndex,
+                                              fieldIndex,
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder=" "
+                                          onFocus={handleKitInputFocus}
+                                          onBlur={handleKitInputBlur}
+                                        />
+                                        <label>Quantity</label>
+                                      </div>
+                                      <div className="kit-component-quantity">
+                                        <input
+                                          type="text"
+                                          name={`batch-${fieldIndex}`}
+                                          value={entry.batches[fieldIndex]}
+                                          onChange={(e) =>
+                                            handleChange(
+                                              entryIndex,
+                                              fieldIndex,
+                                              "batches",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder=" "
+                                          onFocus={handleKitInputFocus}
+                                          onBlur={handleKitInputBlur}
+                                        />
+                                        <label>Batch No.</label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Kit Components Section */}
+                      {entry.isKit &&
+                        entry.kitData &&
+                        entry.kitData.length > 0 && (
+                          <div className="kit-components-section">
+                            <div className="kit-components-header">
+                              <h4>Kit Components:</h4>
+                              <p className="kit-info">
+                                Enter quantities for each kit component
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  console.log(
+                                    "Testing kit detection for entry:",
+                                    entryIndex
+                                  )
+                                  console.log("Entry data:", entry)
+                                  console.log(
+                                    "PurchaseOrderDetails:",
+                                    purchaseOrderDetails
+                                  )
+                                }}
+                                style={{
+                                  fontSize: "0.8em",
+                                  padding: "2px 8px",
+                                  marginTop: "5px",
+                                }}
+                              >
+                                Debug Kit Data
+                              </button>
+                            </div>
+                            <div className="kit-components-container">
+                              {entry.kitData.map((kitItem, kitIndex) => (
+                                <div
+                                  key={kitIndex}
+                                  className="kit-component-item"
+                                >
+                                  <div className="kit-component-header">
+                                    <strong>Component {kitIndex + 1}:</strong>{" "}
+                                    {kitItem.prod_desc}
+                                  </div>
+                                  <div className="kit-component-details">
+                                    <div className="kit-component-info">
+                                      <span>PO Sl No: {kitItem.po_sl_no}</span>
+                                      <span>
+                                        Unit Price: ₹{kitItem.unit_price}
+                                      </span>
+                                      <span>
+                                        Pack Size: {kitItem.pack_size || "N/A"}
+                                      </span>
+                                      <span
+                                        className={`kit-component-balance ${getStockLevelClass(
+                                          kitItem.qty_balance
+                                        )}`}
+                                      >
+                                        Balance: {kitItem.qty_balance || 0}{" "}
+                                        units
+                                        {kitItem.quantity &&
+                                          parseFloat(kitItem.quantity) > 0 && (
+                                            <span className="remaining-balance">
+                                              {" "}
+                                              (Remaining:{" "}
+                                              {getRemainingBalance(kitItem)})
+                                            </span>
+                                          )}
+                                      </span>
+                                    </div>
+                                    <div className="kit-component-fields">
+                                      <div className="kit-component-hsn">
+                                        <input
+                                          type="text"
+                                          name={`kit-hsn-${kitIndex}`}
+                                          value={kitItem.hsnSac || ""}
+                                          onChange={(e) =>
+                                            handleKitComponentFieldChange(
+                                              entryIndex,
+                                              kitIndex,
+                                              "hsnSac",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder=" "
+                                          onFocus={handleKitInputFocus}
+                                          onBlur={handleKitInputBlur}
+                                        />
+                                        <label>HSN/SAC</label>
+                                      </div>
+                                      <div className="kit-component-quantity">
+                                        <input
+                                          type="number"
+                                          name={`kit-quantity-${kitIndex}`}
+                                          value={kitItem.quantity || ""}
+                                          onChange={(e) =>
+                                            handleKitComponentQuantityChange(
+                                              entryIndex,
+                                              kitIndex,
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder=" "
+                                          min="0"
+                                          step="0.01"
+                                          onFocus={handleKitInputFocus}
+                                          onBlur={handleKitInputBlur}
+                                        />
+                                        <label>Quantity</label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                     </div>
                   </div>
                 ))}
