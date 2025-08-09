@@ -5,6 +5,8 @@ import Invoice from "../../components/Invoice/Invoice"
 import api from "../../api/api"
 import DcPrint from "../../components/DC/Dc"
 import { ToastContainer, toast } from "react-toastify"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+import { faSpinner } from "@fortawesome/free-solid-svg-icons"
 import "react-toastify/dist/ReactToastify.css"
 
 export default function InvoicePrint() {
@@ -15,8 +17,10 @@ export default function InvoicePrint() {
   })
   const [responseData, setResponseData] = useState()
   const [totalPages, setTotalPages] = useState(0) // Using state to trigger a re-render
+  const [isLoading, setIsLoading] = useState(false)
 
   const componentRef = useRef()
+  const dcComponentRef = useRef()
 
   useEffect(() => {
     api.get("/printInvoicePageData").then((response) => {
@@ -65,7 +69,14 @@ export default function InvoicePrint() {
       })
     },
     onAfterPrint: () => {
-      console.log("Print finished")
+      console.log("Invoice print finished")
+    },
+  })
+
+  const handleDcPrint = useReactToPrint({
+    content: () => dcComponentRef.current,
+    onAfterPrint: () => {
+      console.log("DC print finished")
     },
   })
 
@@ -105,8 +116,17 @@ export default function InvoicePrint() {
     )
   })
 
+  const DcComponent = React.forwardRef((props, ref) => {
+    return (
+      <div ref={ref} className="dc-container-container">
+        <DcPrint formData={responseData} />
+      </div>
+    )
+  })
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    setIsLoading(true)
     api
       .get("/invoiceGeneration", {
         params: {
@@ -123,10 +143,17 @@ export default function InvoicePrint() {
         toast.error(error.response.data.error)
         setResponseData()
       })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }
 
   return (
     <div className="invoice-report-container">
+      <div className="reports-header">
+        <h2>📋 View & Print Reports</h2>
+      </div>
+
       <div className="input-details-container">
         <h3>Invoice No.</h3>
         <form onSubmit={handleSubmit} className="input-details-form">
@@ -153,19 +180,76 @@ export default function InvoicePrint() {
             />
             <label alt="Enter the year" placeholder="Year"></label>
           </div>
-          <button type="submit">Get Invoice</button>
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin /> Loading...
+              </>
+            ) : (
+              "Get Invoice"
+            )}
+          </button>
         </form>
-
-        {responseData && (
-          <>
-            <div>
-              <button onClick={handlePrint}>Print this out!</button>
-            </div>
-            <InvoiceC ref={componentRef} />
-            <DcPrint formData={responseData} />
-          </>
-        )}
       </div>
+
+      {/* Show skeleton cards while loading */}
+      {isLoading && (
+        <div className="preview-section">
+          <div className="document-card skeleton-card">
+            <div className="document-header">
+              <h3>📄 Invoice</h3>
+              <div className="skeleton-button"></div>
+            </div>
+            <div className="document-preview skeleton-preview">
+              <div className="skeleton-content"></div>
+            </div>
+          </div>
+
+          <div className="document-card skeleton-card">
+            <div className="document-header">
+              <h3>📦 Delivery Challan</h3>
+              <div className="skeleton-button"></div>
+            </div>
+            <div className="document-preview skeleton-preview">
+              <div className="skeleton-content"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show actual documents when data is loaded */}
+      {responseData && !isLoading && (
+        <div className="preview-section">
+          <div className="document-card">
+            <div className="document-header">
+              <h3>📄 Invoice</h3>
+              <button onClick={handlePrint} className="print-button">
+                🖨️ Print Invoice
+              </button>
+            </div>
+            <div className="document-preview">
+              <div className="scaled-document">
+                <InvoiceC ref={componentRef} />
+              </div>
+            </div>
+          </div>
+
+          <div className="document-card">
+            <div className="document-header">
+              <h3>📦 Delivery Challan</h3>
+              <button onClick={handleDcPrint} className="print-button">
+                🖨️ Print DC
+              </button>
+            </div>
+            <div className="document-preview">
+              <div className="scaled-document">
+                <DcComponent ref={dcComponentRef} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer />
     </div>
   )

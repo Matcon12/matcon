@@ -1,17 +1,16 @@
 import "./UpdatePO.css"
 import { Link } from "react-router-dom"
-import "../CreatePO/Customer.css"
 import api from "../../../api/api.jsx"
 import { useState, useEffect } from "react"
 import { DatePicker, Space } from "antd"
 import dayjs from "dayjs"
 // import possibleValues from "../../../../data.js"
-import AutoCompleteComponent from "../../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../../reuse/ui/AutoCompleteUtil.jsx"
 import { format, addYears, parse, isAfter } from "date-fns"
 import { ToastContainer, toast } from "react-toastify"
 
 import "react-toastify/dist/ReactToastify.css"
-import UpdateProductForm from "../../../reuse/UpdateProduct/UpdateProductForm.jsx"
+import UpdateProductForm from "./UpdateProductForm.jsx"
 
 export default function UpdatePO() {
   const initialSearchInputs = {
@@ -39,6 +38,7 @@ export default function UpdatePO() {
     delivery_date: null,
     // omat: "",
     hsn_sac: "",
+    location: "",
   }
 
   const [searchInputs, setSearchInputs] = useState(initialSearchInputs)
@@ -56,6 +56,33 @@ export default function UpdatePO() {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   const [kitData, setKitData] = useState()
+  const [isKit, setIsKit] = useState(false)
+
+  // Function to validate common columns consistency across all records
+  const validateCommonColumnsConsistency = (mainData, kitData) => {
+    if (!mainData || !kitData || kitData.length === 0) return true
+
+    const commonFields = [
+      "podate",
+      "po_validity",
+      "quote_id",
+      "consignee_id",
+      "location",
+    ]
+    const firstRecord = mainData
+
+    for (const kitItem of kitData) {
+      for (const field of commonFields) {
+        if (firstRecord[field] !== kitItem[field]) {
+          console.warn(
+            `Inconsistent ${field}: main=${firstRecord[field]}, kit=${kitItem[field]}`
+          )
+          return false
+        }
+      }
+    }
+    return true
+  }
 
   useEffect(() => {
     api.get("/getCustomerData").then((response) => {
@@ -88,13 +115,36 @@ export default function UpdatePO() {
           })
           .then((response) => {
             let data = response.data.data[0]
-            console.log("data: ", data)
-            console.log(response.data.filtered_data)
+
             setKitData(response.data.filtered_data)
-            console.log(response.data.filtered_data)
+            setIsKit(response.data.is_kit || false)
+
+            // Show appropriate message based on product type
+            if (response.data.is_kit) {
+              toast.info(
+                `KIT product detected with ${
+                  response.data.filtered_data?.length || 0
+                } components`
+              )
+            } else if (response.data.filtered_data?.length > 0) {
+              toast.info(
+                `Regular product with ${response.data.filtered_data?.length} hierarchical items`
+              )
+            }
+
+            // Validate common columns consistency
+            const isConsistent = validateCommonColumnsConsistency(
+              data,
+              response.data.filtered_data
+            )
+            if (!isConsistent) {
+              toast.warning(
+                "Inconsistent common columns detected across related records. The system will synchronize them during update."
+              )
+            }
+
             const parsedDate = parse(data.podate, "yyyy-MM-dd", new Date())
             const formattedPoDate = format(parsedDate, "dd-MM-yyyy")
-            console.log(formattedPoDate)
 
             const parsedValidityDate = data.po_validity
               ? parse(data.po_validity, "yyyy-MM-dd", new Date())
@@ -102,7 +152,6 @@ export default function UpdatePO() {
             const formattedValidityDate = parsedValidityDate
               ? format(parsedValidityDate, "dd-MM-yyyy")
               : null
-            console.log(formattedValidityDate)
 
             const parsedDeliveryDate = data.delivery_date
               ? parse(data.delivery_date, "yyyy-MM-dd", new Date())
@@ -111,11 +160,7 @@ export default function UpdatePO() {
             const formattedDeliveryDate = parsedDeliveryDate
               ? format(parsedDeliveryDate, "dd-MM-yyyy")
               : null
-            console.log(
-              formattedPoDate,
-              formattedValidityDate,
-              formattedDeliveryDate
-            )
+
             setSearchData({
               pono: data.pono,
               podate: formattedPoDate,
@@ -138,12 +183,8 @@ export default function UpdatePO() {
               hsn_sac: data.hsn_sac,
               // omat: data.omat,
               uom: data.uom,
+              location: data.location,
             })
-            console.log("data: ", data)
-            console.log("searchData: ", searchData)
-            toast.info(
-              `Successfully fetched data for PO Sl No. ${data.po_sl_no}`
-            )
           })
           .catch((error) => {
             setSearchData((prevSearchData) => ({
@@ -168,22 +209,33 @@ export default function UpdatePO() {
               delivery_date: "",
               hsn_sac: "",
               // omat: "",
+              location: "",
             }))
-            console.log(error.response.data.error)
             toast.error("Error fetching the data")
           })
       : api
           .get("/getData", {
             params: {
               pono: searchData.pono,
+              ...(searchData.po_sl_no && { po_sl_no: searchData.po_sl_no }),
             },
           })
           .then((response) => {
             const data = response.data.data
-            console.log("response: ", data)
-            setKitData(response.data.filtered_data)
+
             setPoslnos(response.data.po_sl_nos)
-            console.log(response.data.po_sl_nos)
+
+            // Validate common columns consistency
+            const isConsistent = validateCommonColumnsConsistency(
+              data,
+              response.data.filtered_data
+            )
+            if (!isConsistent) {
+              toast.warning(
+                "Inconsistent common columns detected across related records. The system will synchronize them during update."
+              )
+            }
+
             const parsedDate = parse(data.podate, "yyyy-MM-dd", new Date())
             const formattedPoDate = format(parsedDate, "dd-MM-yyyy")
             const validityDate = addYears(data.podate, 1)
@@ -215,11 +267,31 @@ export default function UpdatePO() {
               delivery_date: formattedDeliveryDate,
               uom: data.uom,
               hsn_sac: data.hsn_sac,
+              location: data.location,
             })
-            toast.success("Successfuly fetched Data!!")
+
+            // Set kit data and check if it's a kit product
+            if (
+              response.data.filtered_data &&
+              response.data.filtered_data.length > 0
+            ) {
+              setKitData(response.data.filtered_data)
+              setIsKit(true)
+            } else {
+              setKitData(null)
+              setIsKit(false)
+            }
+
+            // Mark initial load as complete
+            setIsInitialLoad(false)
+
+            const successMessage = searchData.po_sl_no
+              ? `Successfully fetched data for PO Sl No: ${data.po_sl_no}`
+              : "Successfully fetched data!!"
+            toast.success(successMessage)
           })
           .catch((error) => {
-            console.log(error.response.data.error)
+            setIsInitialLoad(false) // Mark initial load as complete even on error
             toast.error("ERROR in Fetching Data")
           })
   }
@@ -247,59 +319,93 @@ export default function UpdatePO() {
       delivery_date: null,
       // omat: "",
       hsn_sac: "",
+      location: "",
     })
   }
 
   const handleUpdate = (e) => {
     e.preventDefault()
-    console.log("update data: ", searchData)
-    console.log("kit data: ", kitData)
+
+    // Validate common columns before sending update
+    const validateCommonColumns = (data) => {
+      const required = ["podate", "location"]
+      const missing = required.filter((field) => !data[field])
+      if (missing.length > 0) {
+        toast.error(`Missing required fields: ${missing.join(", ")}`)
+        return false
+      }
+      return true
+    }
+
+    if (!validateCommonColumns(searchData)) {
+      return
+    }
+
     api
       .put("/updateForm", { searchInputs, searchData, kitData })
       .then((response) => {
-        console.log(response.data)
-        // resetDataForm()
-        // setKitData()
-        toast.success(
-          `Form Updated Successfully for PO Sl No: ${searchData.po_sl_no}`
-        )
+        // Show success message with information about synchronized records
+        if (response.data.message) {
+          toast.success(response.data.message)
+          // If kit components were updated, show additional info
+          if (response.data.kit_updates && response.data.kit_updates > 0) {
+            toast.info(
+              `Successfully updated ${response.data.kit_updates} kit component(s)`
+            )
+          }
+        } else {
+          toast.success(
+            `Form Updated Successfully for PO Sl No: ${searchData.po_sl_no}`
+          )
+        }
       })
       .catch((error) => {
-        console.error("Error updating data: ", error)
-        toast.error("ERROR: Invalid/Missing Input Data")
+        const errorMessage =
+          error.response?.data?.error || "ERROR: Invalid/Missing Input Data"
+        toast.error(errorMessage)
       })
   }
 
   const handleChangeData = (e) => {
     const { name, value } = e.target
-    console.log(name, value)
-    setSearchData({
-      ...searchData,
-      [name]: ["quantity", "unit_price", "qty_sent", "qty_balance"].includes(
-        name
-      )
-        ? parseFloat(value)
-        : value,
-    })
+
+    // Check if this is a common column
+    const commonColumns = ["quote_id", "consignee_id", "location"]
+    if (commonColumns.includes(name)) {
+      handleCommonColumnChange(name, value)
+    } else {
+      setSearchData({
+        ...searchData,
+        [name]: ["quantity", "unit_price", "qty_sent", "qty_balance"].includes(
+          name
+        )
+          ? parseFloat(value)
+          : value,
+      })
+    }
   }
 
   const onDateChange = (date, dateString) => {
-    console.log("dateString: ", dateString)
-    setSearchData((prevFormData) => ({
-      ...prevFormData,
-      podate: dateString,
-    }))
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+    handleCommonColumnChange("podate", value)
   }
 
   const onDeliveryDateChange = (date, dateString) => {
     const poDateString = searchData.podate
 
+    // Handle empty string or null values when user clears the date
+    if (!dateString || dateString.trim() === "") {
+      setSearchData((prevFormData) => ({
+        ...prevFormData,
+        delivery_date: null,
+      }))
+      return
+    }
+
     // Parse the dates from "dd-MM-yyyy" format
     const poDate = parse(poDateString, "dd-MM-yyyy", new Date())
     const deliveryDate = parse(dateString, "dd-MM-yyyy", new Date())
-
-    console.log("PO Date:", format(poDate, "dd-MM-yyyy"))
-    console.log("Delivery Date:", format(deliveryDate, "dd-MM-yyyy"))
 
     setSearchData((prevFormData) => ({
       ...prevFormData,
@@ -312,19 +418,35 @@ export default function UpdatePO() {
   }
 
   const onValidityDateChange = (date, dateString) => {
-    setSearchData((prevFormData) => ({
-      ...prevFormData,
-      po_validity: dateString,
-    }))
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+    handleCommonColumnChange("po_validity", value)
   }
 
-  function parsePackSize(pk_Sz) {    
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
+  // Helper function to handle common column changes
+  const handleCommonColumnChange = (field, value) => {
+    setSearchData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+
+    // Optionally update kit data with the same common column value
+    // This ensures consistency in the frontend state
+    if (kitData && kitData.length > 0) {
+      setKitData((prev) =>
+        prev.map((item) => ({
+          ...item,
+          [field]: value,
+        }))
+      )
+    }
+  }
+
+  function parsePackSize(pk_Sz) {
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
     const match = pk_Sz.match(regex)
-  
-    console.log("Match:",match)
+
     if (match) {
-      console.log("PkSz:",match[1],"UoM:",match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -337,27 +459,50 @@ export default function UpdatePO() {
 
   const handleQtyChange = (e) => {
     const { name, value } = e.target
-    const qtyUom = parsePackSize(searchData.pack_size);
-    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+    const qtyUom = parsePackSize(searchData.pack_size)
 
     // Ensure that value is a valid, positive integer
-    const qnty = parseFloat(value);
+    const qnty = parseFloat(value)
     if (isNaN(qnty) || qnty <= 0) {
-      toast.error("Quantity must be a positive number");
-      e.target.focus();
-      return;
+      toast.error("Quantity must be a positive number")
+      e.target.focus()
+      return
     }
     // Validate quantity against pack size
     if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
-      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
-      e.target.focus();
-      return;
+      toast.error(
+        `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
+      )
+      e.target.focus()
+      return
     }
   }
 
+  // Function to calculate main kit quantity from kit components
+  const calculateMainKitQuantity = (kitData) => {
+    if (!kitData || kitData.length === 0) return 0
+
+    return kitData.reduce((sum, component) => {
+      const qty = parseFloat(component.quantity) || 0
+      return sum + qty
+    }, 0)
+  }
+
+  // Update main kit quantity when kit component quantities change
+  useEffect(() => {
+    if (isKit && kitData && kitData.length > 0) {
+      const mainKitQuantity = calculateMainKitQuantity(kitData)
+
+      setSearchData((prevData) => ({
+        ...prevData,
+        quantity: mainKitQuantity,
+      }))
+    }
+  }, [kitData, isKit])
+
   useEffect(() => {
     const balance = searchData.quantity - searchData.qty_sent
-    const total   = parseFloat(
+    const total = parseFloat(
       searchData.quantity * searchData.unit_price
     ).toFixed(2)
 
@@ -367,20 +512,20 @@ export default function UpdatePO() {
       total_price: total,
     }))
   }, [searchData.qty_sent, searchData.quantity, searchData.unit_price])
-  
+
   return (
-    <div className="customer-container">
-      <div className="complete-form-container">
-        <div className="form-header-container">
+    <div className="update-po-container">
+      <div className="update-po-form-container">
+        <div className="update-po-header-container">
           <h1>Update Customer Purchase Order</h1>
           <Link to="/purchase_order">New Entry</Link>
         </div>
         <div className="form-container">
           {/* fetching the data from the database to edit */}
           <form onSubmit={handleSubmit} autoComplete="off">
-            <div className="only-input-styles">
+            <div className="update-po-input-styles">
               <div className="autocomplete-wrapper">
-                <AutoCompleteComponent
+                <AutoCompleteUtil
                   data={purchaseOrder}
                   mainData={searchData}
                   setData={setPurchaseOrder}
@@ -409,7 +554,7 @@ export default function UpdatePO() {
                 ></label>
               </div>
               <div className="autocomplete-wrapper">
-                <AutoCompleteComponent
+                <AutoCompleteUtil
                   data={poslnos}
                   mainData={searchData}
                   setData={setPoslnos}
@@ -423,8 +568,10 @@ export default function UpdatePO() {
                 />
               </div>
 
-              <div className="form-button-container">
-                <button type="submit">Get Data</button>
+              <div className="update-po-button-container">
+                <button type="submit" className="update-po-submit-btn">
+                  Get Data
+                </button>
               </div>
             </div>
           </form>
@@ -433,7 +580,7 @@ export default function UpdatePO() {
           <form onSubmit={handleUpdate}>
             {/* {searchData.pono && ( */}
             <>
-              <div className="only-input-styles">
+              <div className="update-po-input-styles">
                 <div>
                   <div className="datePickerContainer">
                     <Space direction="vertical">
@@ -490,7 +637,7 @@ export default function UpdatePO() {
                   ></label>
                 </div>
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={consigneeData}
                     mainData={searchData}
                     setData={setConsigneeData}
@@ -504,7 +651,7 @@ export default function UpdatePO() {
                 </div>
                 {/*
                 <div className="autocomplete-wrapper">
-                  <AutoCompleteComponent
+                  <AutoCompleteUtil
                     data={suggestions}
                     setData={setSuggestions}
                     mainData={searchData}
@@ -530,6 +677,18 @@ export default function UpdatePO() {
                     alt="Enter the Prod Code"
                     placeholder="Product Code"
                   ></label>
+                </div>
+                <div>
+                  <select
+                    name="location"
+                    value={searchData.location}
+                    onChange={handleChangeData}
+                    required
+                  >
+                    <option value="HBL">Hebbal (HBL)</option>
+                    <option value="ASP">Aerospace Park (ASP)</option>
+                  </select>
+                  <label alt="Select Location" placeholder="Location"></label>
                 </div>
                 <div className="specifications-span-2">
                   <textarea
@@ -590,12 +749,34 @@ export default function UpdatePO() {
                     onChange={handleChangeData}
                     onBlur={handleQtyChange}
                     placeholder=" "
-                    //                    readOnly
+                    readOnly={isKit && kitData && kitData.length > 0}
+                    style={{
+                      backgroundColor:
+                        isKit && kitData && kitData.length > 0
+                          ? "#f5f5f5"
+                          : "white",
+                      cursor:
+                        isKit && kitData && kitData.length > 0
+                          ? "not-allowed"
+                          : "text",
+                    }}
                   />
                   <label
                     alt="Enter the Quantity"
                     placeholder="Quantity"
                   ></label>
+                  {isKit && kitData && kitData.length > 0 && (
+                    <small
+                      style={{
+                        color: "#666",
+                        fontSize: "12px",
+                        marginTop: "4px",
+                        display: "block",
+                      }}
+                    >
+                      Auto-calculated from kit components
+                    </small>
+                  )}
                 </div>
                 {/* <div>
                   <input
@@ -704,11 +885,52 @@ export default function UpdatePO() {
                   </div>
                 </div>
               </div>
-              {kitData &&
+              {isKit && (
+                <div
+                  style={{
+                    backgroundColor: "#e6f7ff",
+                    border: "1px solid #91d5ff",
+                    borderRadius: "4px",
+                    padding: "12px",
+                    margin: "16px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>📦</span>
+                  <span style={{ fontWeight: "500", color: "#1890ff" }}>
+                    This is a KIT product with {kitData?.length || 0} components
+                  </span>
+                </div>
+              )}
+              {isKit && (!kitData || kitData.length === 0) && (
+                <div
+                  style={{
+                    backgroundColor: "#fff7e6",
+                    border: "1px solid #ffd591",
+                    borderRadius: "4px",
+                    padding: "12px",
+                    margin: "16px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>⚠️</span>
+                  <span style={{ fontWeight: "500", color: "#fa8c16" }}>
+                    KIT product detected but no components found
+                  </span>
+                </div>
+              )}
+
+              {isKit &&
+                kitData &&
                 kitData.length > 0 &&
                 kitData.map((item, index) => {
                   return (
                     <UpdateProductForm
+                      key={`kit-${index}`}
                       data={item}
                       kitData={kitData}
                       setKitData={setKitData}
@@ -719,8 +941,10 @@ export default function UpdatePO() {
               <div>
                 <p>{success}</p>
               </div>
-              <div className="form-button-container">
-                <button type="submit">Update</button>
+              <div className="update-po-button-container">
+                <button type="submit" className="update-po-submit-btn">
+                  Update
+                </button>
               </div>
             </>
             {/* )} */}

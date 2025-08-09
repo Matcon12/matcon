@@ -8,7 +8,7 @@ import {
   faPlus,
 } from "@fortawesome/free-solid-svg-icons"
 import "./ProductDetails.css"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent"
+import AutoCompleteUtil from "../ui/AutoCompleteUtil.jsx"
 import api from "../../api/api.jsx"
 import useDebounce from "../../hooks/useDebounce.jsx"
 import KitProducts from "./KitProducts.jsx"
@@ -31,6 +31,7 @@ export default function ProductDetails({
   handleProductClear,
   kit,
   setKit,
+  errors,
 }) {
   const initialProductDetails = {
     poSlNo: "",
@@ -47,7 +48,10 @@ export default function ProductDetails({
   }
 
   useEffect(() => {
-    let total = parseFloat(formData[index].quantity * formData[index].unitPrice)
+    const isKitComponent =
+      formData[index].poSlNo && formData[index].poSlNo.includes(".")
+    const unitPrice = isKitComponent ? 0 : formData[index].unitPrice || 0
+    let total = parseFloat(formData[index].quantity * unitPrice)
 
     setTotal(total.toFixed(2), index)
   }, [formData[index].quantity, formData[index].unitPrice])
@@ -57,8 +61,8 @@ export default function ProductDetails({
   }
 
   const debouncedProdId = useDebounce(formData[index].prodId, 100)
-  const [qtyUom, setQtyUom] = useState(null); // For deriving the PkSz and UoM
-  
+  const [qtyUom, setQtyUom] = useState(null) // For deriving the PkSz and UoM
+
   const [popup, setPopup] = useState(false)
   const [kitQuantity, setKitQuantity] = useState("")
 
@@ -81,15 +85,15 @@ export default function ProductDetails({
     )
   }
 
-  function parsePackSize(pk_Sz) {    
+  function parsePackSize(pk_Sz) {
     //const regex = /^(\d+|\d*\.\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/;
-  
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/
+
     const match = pk_Sz.match(regex)
-  
-    console.log("Match:",match)
+
+    console.log("Match:", match)
     if (match) {
-      console.log("PkSz:",match[1],"UoM:",match[2])
+      console.log("PkSz:", match[1], "UoM:", match[2])
       return {
         qty: parseFloat(match[1]),
         u_o_m: match[2],
@@ -109,18 +113,21 @@ export default function ProductDetails({
         },
       })
       .then((response) => {
-        const parsedPkSz = parsePackSize(response.data.pack_size);
-        console.log("Pack:", parsedPkSz.qty, "UoM:", parsedPkSz.u_o_m);
-        setQtyUom(parsedPkSz); // Store in state
+        const parsedPkSz = parsePackSize(response.data.pack_size)
+        console.log("Pack:", parsedPkSz.qty, "UoM:", parsedPkSz.u_o_m)
+        setQtyUom(parsedPkSz) // Store in state
 
         setFormData(
           formData.map((productDetail, idx) => {
             if (idx === index) {
+              const isKitComponent =
+                productDetail.poSlNo && productDetail.poSlNo.includes(".")
               return {
                 ...productDetail,
                 packSize: response.data.pack_size,
                 productDesc: response.data.prod_desc,
-                uom : parsedPkSz.u_o_m
+                uom: parsedPkSz.u_o_m,
+                unitPrice: isKitComponent ? 0 : response.data.price || "",
               }
             }
             return productDetail
@@ -128,7 +135,10 @@ export default function ProductDetails({
         )
       })
       .catch((error) => {
-        console.log(error.response.data.error)
+        console.log(
+          "API Error:",
+          error?.response?.data?.error || error?.message || "Unknown error"
+        )
       })
     if (debouncedProdId.startsWith("KIT")) {
       setPopup(true)
@@ -137,63 +147,61 @@ export default function ProductDetails({
 
   const handleQtyChange = (e) => {
     const { name, value } = e.target
-    console.log("OnBlur-handleQtyChange",name,value,qtyUom?.qty, qtyUom?.u_o_m)
+    console.log(
+      "OnBlur-handleQtyChange",
+      name,
+      value,
+      qtyUom?.qty,
+      qtyUom?.u_o_m
+    )
 
     // Ensure that value is a valid, positive integer
-    const qnty = parseFloat(value);
+    const qnty = parseFloat(value)
     if (isNaN(qnty) || qnty <= 0) {
-      toast.error("Quantity must be a positive number");
-      e.target.focus();
-      return;
+      toast.error("Quantity must be a positive number")
+      e.target.focus()
+      return
     }
-    // Validate quantity against pack size
+
+    // Skip pack size validation for kit products
+    if (formData[index].prodId.startsWith("KIT")) {
+      return
+    }
+
+    // Validate quantity against pack size for non-kit products
     // if (qnty < qtyUom.qty || qnty % qtyUom.qty !== 0) {
     // If qnty is a fraction, this check fails, hence * 1000
-    if (qnty < qtyUom.qty || ((qnty * 1000) % (qtyUom.qty * 1000)) !== 0) {
-      toast.error(`Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`);
-      e.target.focus();
-      return;
+    if (qnty < qtyUom.qty || (qnty * 1000) % (qtyUom.qty * 1000) !== 0) {
+      toast.error(
+        `Quantity must be a multiple of Pack Size (${qtyUom.qty} ${qtyUom.u_o_m})`
+      )
+      e.target.focus()
+      return
     }
   }
 
-  const handlePkszChange = (idx,e) => {
-    const {name, value} = e.target
+  const handlePkszChange = (idx, e) => {
+    const { name, value } = e.target
     if (formData[index].prodId.startsWith("KIT")) {
       try {
-        const pkUom = parsePackSize(formData[index].packSize);
-        console.log("Pk:", pkUom.qty, "UoM:", pkUom.u_o_m);
-        setQtyUom(pkUom); // Store in state                          
-        setFormData(                                             
-          formData.map((productDetail, index) => {               
-            if (idx === index) {                                 
-              return {                                           
-                ...productDetail,                                
-                packSize: pkUom?.qty + " " + pkUom?.u_o_m,     
-                uom: pkUom?.u_o_m,                              
-              }                                                  
-            }                                                    
-            return productDetail                                 
-          })                                                     
-        )                                                      
+        const pkUom = parsePackSize(formData[index].packSize)
+        console.log("Pk:", pkUom.qty, "UoM:", pkUom.u_o_m)
+        setQtyUom(pkUom) // Store in state
+        setFormData(
+          formData.map((productDetail, index) => {
+            if (idx === index) {
+              return {
+                ...productDetail,
+                packSize: pkUom?.qty + " " + pkUom?.u_o_m,
+                uom: pkUom?.u_o_m,
+              }
+            }
+            return productDetail
+          })
+        )
       } catch (error) {
-        console.error("Error parsing pack size:", error.message);
-        toast.error("Invalid Pack Size format");
-        setFormData(                                             
-          formData.map((productDetail, index) => {               
-            if (idx === index) {                                 
-              return {                                           
-                ...productDetail,                                
-                packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,     
-                uom: qtyUom?.u_o_m,                              
-              }                                                  
-            }                                                    
-            return productDetail                                 
-          })                                                     
-        )                                                      
-      }
-    } else {
-        console.log("PackSize can be changed only for KIT"); 
-        toast.error("PackSize can be changed only for KIT");
+        console.error("Error parsing pack size:", error.message)
+        toast.error("Invalid Pack Size format")
         setFormData(
           formData.map((productDetail, index) => {
             if (idx === index) {
@@ -206,6 +214,22 @@ export default function ProductDetails({
             return productDetail
           })
         )
+      }
+    } else {
+      console.log("PackSize can be changed only for KIT")
+      toast.error("PackSize can be changed only for KIT")
+      setFormData(
+        formData.map((productDetail, index) => {
+          if (idx === index) {
+            return {
+              ...productDetail,
+              packSize: qtyUom?.qty + " " + qtyUom?.u_o_m,
+              uom: qtyUom?.u_o_m,
+            }
+          }
+          return productDetail
+        })
+      )
     }
   }
 
@@ -244,7 +268,7 @@ export default function ProductDetails({
       return newPoSlNo
     }
 
-    // Create new entries based on kitQuantity
+    // Create new entries based on kitQuantity (only required fields for kit components)
     const newEntries = Array.from({ length: kitQuantity }, (_, index) => ({
       poSlNo: new_poSlNo(index),
       prodId: "",
@@ -252,10 +276,10 @@ export default function ProductDetails({
       productDesc: "",
       msrr: "",
       uom: "",
-      hsn_sac: "",
       quantity: "",
       unitPrice: 0,
       totalPrice: 0,
+      hsn_sac: "",
       deliveryDate: null,
     }))
 
@@ -274,10 +298,11 @@ export default function ProductDetails({
   }
 
   const checkKit = isKit[index]
+  const isKitComponent =
+    formData[index].poSlNo && formData[index].poSlNo.includes(".")
 
   return (
     <>
-      <hr />
       <div className="product-desc-only-inputs">
         <div className="productDescContainer">
           <div>
@@ -293,7 +318,7 @@ export default function ProductDetails({
           </div>
           {/* {console.log("main data: ", formData)} */}
           <div className="autocomplete-wrapper">
-            <AutoCompleteComponent
+            <AutoCompleteUtil
               data={suggestions}
               mainData={formData}
               setMainData={setFormData}
@@ -305,7 +330,11 @@ export default function ProductDetails({
               array={true}
               nested={true}
               index={index}
+              className={errors?.prodId ? "error-input" : ""}
             />
+            {errors?.prodId && (
+              <div className="error-message">{errors.prodId}</div>
+            )}
           </div>
           <div>
             <input
@@ -351,73 +380,77 @@ export default function ProductDetails({
               name="quantity"
               value={formData[index].quantity}
               onChange={(e) => handleChange(index, e)}
-              onBlur={(e) => handleQtyChange(e)}
+              onBlur={(e) => {
+                // Format to 2 decimal places on blur
+                const numValue = parseFloat(e.target.value)
+                if (!isNaN(numValue)) {
+                  handleChange(index, {
+                    target: { name: "quantity", value: numValue.toFixed(2) },
+                  })
+                }
+                handleQtyChange(e)
+              }}
+              onWheel={(e) => e.target.blur()}
               placeholder=" "
+              className={errors?.quantity ? "error-input" : ""}
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
+            {errors?.quantity && (
+              <div className="error-message">{errors.quantity}</div>
+            )}
           </div>
-          {checkKit ? (
-            <div>
-              <input
-                type="number"
-                name="unitPrice"
-                value={formData[index].unitPrice}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-              />
-              <label
-                alt="Enter the Unit Price"
-                placeholder="Rate per UOM"
-              ></label>
-            </div>
-          ) : null}
+          {/* Show unit price, total price, and HSN/SAC only for non-kit components */}
+          {!isKitComponent && (
+            <>
+              <div>
+                <input
+                  type="number"
+                  name="unitPrice"
+                  value={formData[index].unitPrice}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                  className={errors?.unitPrice ? "error-input" : ""}
+                />
+                <label
+                  alt="Enter the Unit Price"
+                  placeholder="Rate per UOM"
+                ></label>
+                {errors?.unitPrice && (
+                  <div className="error-message">{errors.unitPrice}</div>
+                )}
+              </div>
 
-          {checkKit ? (
-            <div>
-              <input
-                type="number"
-                name="totalPrice"
-                value={formData[index].totalPrice}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-                readOnly
-              />
-              <label
-                alt="Enter the Total Price"
-                placeholder="Total Price"
-              ></label>
-            </div>
-          ) : null}
-          {checkKit ? (
-            <div>
-              <input
-                type="text"
-                name="hsn_sac"
-                value={formData[index].hsn_sac}
-                onChange={(e) => handleChange(index, e)}
-                placeholder=" "
-              />
-              <label
-                alt="Enter the HSN/SAC"
-                placeholder="HSN/SAC Code:"
-              ></label>
-            </div>
-          ) : null}
-          {/*<div className="input-container">
-            <select
-              name="uom"
-              value={formData[index].uom}
-              onChange={(e) => handleChange(index, e)}
-            >
-              <option value="" disabled>
-                Select an option
-              </option>
-              <option value="Ltr">Ltr</option>
-              <option value="Kg">Kg</option>
-              <option value="No.">No.</option>
-            </select>
-            <label alt="Select an Option" placeholder="UOM"></label>
-          </div>*/}
+              <div>
+                <input
+                  type="number"
+                  name="totalPrice"
+                  value={formData[index].totalPrice}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                  readOnly
+                />
+                <label
+                  alt="Enter the Total Price"
+                  placeholder="Total Price"
+                ></label>
+              </div>
+              <div>
+                <input
+                  type="text"
+                  name="hsn_sac"
+                  value={formData[index].hsn_sac}
+                  onChange={(e) => handleChange(index, e)}
+                  placeholder=" "
+                />
+                <label
+                  alt="Enter the HSN/SAC"
+                  placeholder="HSN/SAC Code:"
+                ></label>
+              </div>
+            </>
+          )}
+
+          {/* Show UOM for all products */}
           <div>
             <input
               type="text"
@@ -427,8 +460,9 @@ export default function ProductDetails({
             />
             <label alt="Enter the UoM" placeholder="UOM"></label>
           </div>
-          
-          {checkKit ? (
+
+          {/* Show delivery date only for non-kit components */}
+          {checkKit && !isKitComponent ? (
             <div className="deliveryDate">
               <div className="datePickerContainer">
                 <Space direction="vertical">

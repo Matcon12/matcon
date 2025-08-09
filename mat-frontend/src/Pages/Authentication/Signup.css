@@ -107,3 +107,32 @@ input[type="password"] + label[placeholder]:before {
   margin-bottom: 1em; /* Optional spacing below the message */
   font-size: 0.9em; /* Adjust font size if desired */
 }
+
+/* Button styling for authentication pages */
+.signup-container button,
+.login-container button {
+  width: 100%;
+  margin-top: 1em;
+  padding: 0.8em 2em;
+  font-size: 1.1em;
+  font-weight: 600;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 1.25em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.signup-container button:hover,
+.login-container button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.signup-container button:active,
+.login-container button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}

@@ -53,9 +53,10 @@ class CustomerPurchaseOrder(models.Model):
     qty_sent = models.DecimalField(max_digits=14, decimal_places=3, blank=True, null=True)  # max_digits and decimal_places have been guessed, as this database handles decimal fields as float
     delivery_date = models.DateField(blank=True, null=True)
     po_validity = models.DateField(blank=True, null=True)
+    location = models.CharField(max_length=3, default='HBL')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Customer_Purchase_Order'
 
 
@@ -232,9 +233,10 @@ class OtwDc(models.Model):
     contact_name = models.CharField(max_length=20, blank=True, null=True)
     contact_number = models.CharField(max_length=15, blank=True, null=True)
     gst_exemption = models.BooleanField(blank=True, null=True)
+    location = models.CharField(max_length=3, default='HBL')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'otw_dc'
 
 

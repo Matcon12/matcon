@@ -12,14 +12,23 @@ export default function InvoiceReportInput() {
   })
 
   const handleDateChange = (field) => (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+
     setFormData((prev) => ({
       ...prev,
-      [field]: dateString,
+      [field]: value,
     }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Validate that both dates are provided
+    if (!formData.startDate || !formData.endDate) {
+      alert("Please select both start date and end date")
+      return
+    }
 
     try {
       const responseData = await generateInvoiceReport(
@@ -31,7 +40,7 @@ export default function InvoiceReportInput() {
       }
     } catch (error) {
       console.error("Failed to generate invoice report:", error)
-      // Could add error handling UI here
+      alert(`Failed to generate invoice report: ${error.message}`)
     }
   }
 
