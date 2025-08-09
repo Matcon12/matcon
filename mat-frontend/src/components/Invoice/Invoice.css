@@ -98,11 +98,12 @@ table > tbody > tr > td {
   width: 100%;
 }
 
+/* Center alignment for invoice value and toc table */
 .invoice-value > tbody > tr > td,
 .toc-table > tbody > tr > td {
   border: 1px solid #999;
   padding: 0.5rem;
-  text-align: left;
+  text-align: center; /* Center align for better visual balance */
   width: 50%;
   text-align: center;
   vertical-align: top;
@@ -126,13 +127,27 @@ table > tbody > tr > td {
   word-wrap: break-word;
 }
 
-/* .align-start {
-  text-align: start;
-} */
+/* Override specific alignment classes for center alignment */
+.align-start {
+  text-align: center !important; /* Override to center align name and designation */
+}
 
 .toc-container {
   display: grid;
   justify-items: center;
+}
+
+/* Ensure content inside toc table cells is center aligned */
+.toc-table td p,
+.toc-table td b {
+  text-align: center;
+}
+
+/* Ensure invoice value content is center aligned */
+.invoice-value td p,
+.invoice-value td strong,
+.invoice-value td b {
+  text-align: center;
 }
 
 .footer {
