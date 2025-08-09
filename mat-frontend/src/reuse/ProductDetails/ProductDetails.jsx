@@ -31,6 +31,7 @@ export default function ProductDetails({
   handleProductClear,
   kit,
   setKit,
+  errors,
 }) {
   const initialProductDetails = {
     poSlNo: "",
@@ -302,7 +303,6 @@ export default function ProductDetails({
 
   return (
     <>
-      <hr />
       <div className="product-desc-only-inputs">
         <div className="productDescContainer">
           <div>
@@ -330,7 +330,11 @@ export default function ProductDetails({
               array={true}
               nested={true}
               index={index}
+              className={errors?.prodId ? "error-input" : ""}
             />
+            {errors?.prodId && (
+              <div className="error-message">{errors.prodId}</div>
+            )}
           </div>
           <div>
             <input
@@ -376,10 +380,24 @@ export default function ProductDetails({
               name="quantity"
               value={formData[index].quantity}
               onChange={(e) => handleChange(index, e)}
-              onBlur={(e) => handleQtyChange(e)}
+              onBlur={(e) => {
+                // Format to 2 decimal places on blur
+                const numValue = parseFloat(e.target.value)
+                if (!isNaN(numValue)) {
+                  handleChange(index, {
+                    target: { name: "quantity", value: numValue.toFixed(2) },
+                  })
+                }
+                handleQtyChange(e)
+              }}
+              onWheel={(e) => e.target.blur()}
               placeholder=" "
+              className={errors?.quantity ? "error-input" : ""}
             />
             <label alt="Enter the Quantity" placeholder="Quantity"></label>
+            {errors?.quantity && (
+              <div className="error-message">{errors.quantity}</div>
+            )}
           </div>
           {/* Show unit price, total price, and HSN/SAC only for non-kit components */}
           {!isKitComponent && (
@@ -391,11 +409,15 @@ export default function ProductDetails({
                   value={formData[index].unitPrice}
                   onChange={(e) => handleChange(index, e)}
                   placeholder=" "
+                  className={errors?.unitPrice ? "error-input" : ""}
                 />
                 <label
                   alt="Enter the Unit Price"
                   placeholder="Rate per UOM"
                 ></label>
+                {errors?.unitPrice && (
+                  <div className="error-message">{errors.unitPrice}</div>
+                )}
               </div>
 
               <div>

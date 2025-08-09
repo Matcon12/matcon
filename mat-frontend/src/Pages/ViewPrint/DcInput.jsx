@@ -1,5 +1,5 @@
 export default function DcInput() {
-  return(
+  return (
     <form>
       <input type="text" />
     </form>

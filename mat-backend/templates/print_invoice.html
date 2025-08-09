@@ -67,12 +67,28 @@
         padding: 0px;
         font-size: 12px;
         /* margin-top: 1rem;*/
-        margin-top: 130px;
+        margin-top: 4cm; /* Reduced top margin for company header */
+        margin-bottom: 3cm; /* Bottom margin for company footer */
         border: 1px solid black;
         overflow-y: auto;
       }
       body::-webkit-scrollbar {
         display: none;
+      }
+
+      /* Print-specific styles for proper margins */
+      @media print {
+        @page {
+          margin-top: 4cm; /* Top margin for company header */
+          margin-bottom: 3cm; /* Bottom margin for company footer */
+          margin-left: 2cm;
+          margin-right: 1cm;
+        }
+
+        body {
+          margin-top: 0; /* Remove body margin since we have page margin */
+          margin-bottom: 0;
+        }
       }
       .a {
         text-align: center;

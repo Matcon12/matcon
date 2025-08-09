@@ -3,6 +3,8 @@ import "./InvoicePrint.css"
 import { useReactToPrint } from "react-to-print"
 import DcPrint from "../../components/DC/Dc.jsx"
 import api from "../../api/api"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+import { faSpinner } from "@fortawesome/free-solid-svg-icons"
 
 export default function DcReport() {
   const [formData, setFormData] = useState({
@@ -11,6 +13,7 @@ export default function DcReport() {
   })
 
   const [responseData, setResponseData] = useState()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -35,6 +38,7 @@ export default function DcReport() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setIsLoading(true)
     api
       .get("/invoiceGeneration", {
         params: {
@@ -48,6 +52,9 @@ export default function DcReport() {
       })
       .catch((error) => {
         console.log(error.response.data.error)
+      })
+      .finally(() => {
+        setIsLoading(false)
       })
   }
 
@@ -81,7 +88,15 @@ export default function DcReport() {
             />
             <label alt="Enter the year" placeholder="Year"></label>
           </div>
-          <button type="submit">Get DC</button>
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin /> Loading...
+              </>
+            ) : (
+              "Get DC"
+            )}
+          </button>
         </form>
 
         {responseData && (

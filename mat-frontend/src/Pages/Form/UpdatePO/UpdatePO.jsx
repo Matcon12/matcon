@@ -1,6 +1,5 @@
 import "./UpdatePO.css"
 import { Link } from "react-router-dom"
-import "../CreatePO/Customer.css"
 import api from "../../../api/api.jsx"
 import { useState, useEffect } from "react"
 import { DatePicker, Space } from "antd"
@@ -366,11 +365,22 @@ export default function UpdatePO() {
   }
 
   const onDateChange = (date, dateString) => {
-    handleCommonColumnChange("podate", dateString)
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+    handleCommonColumnChange("podate", value)
   }
 
   const onDeliveryDateChange = (date, dateString) => {
     const poDateString = searchData.podate
+
+    // Handle empty string or null values when user clears the date
+    if (!dateString || dateString.trim() === "") {
+      setSearchData((prevFormData) => ({
+        ...prevFormData,
+        delivery_date: null,
+      }))
+      return
+    }
 
     // Parse the dates from "dd-MM-yyyy" format
     const poDate = parse(poDateString, "dd-MM-yyyy", new Date())
@@ -387,7 +397,9 @@ export default function UpdatePO() {
   }
 
   const onValidityDateChange = (date, dateString) => {
-    handleCommonColumnChange("po_validity", dateString)
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+    handleCommonColumnChange("po_validity", value)
   }
 
   // Helper function to handle common column changes
@@ -481,16 +493,16 @@ export default function UpdatePO() {
   }, [searchData.qty_sent, searchData.quantity, searchData.unit_price])
 
   return (
-    <div className="customer-container">
-      <div className="complete-form-container">
-        <div className="form-header-container">
+    <div className="update-po-container">
+      <div className="update-po-form-container">
+        <div className="update-po-header-container">
           <h1>Update Customer Purchase Order</h1>
           <Link to="/purchase_order">New Entry</Link>
         </div>
         <div className="form-container">
           {/* fetching the data from the database to edit */}
           <form onSubmit={handleSubmit} autoComplete="off">
-            <div className="only-input-styles">
+            <div className="update-po-input-styles">
               <div className="autocomplete-wrapper">
                 <AutoCompleteUtil
                   data={purchaseOrder}
@@ -535,8 +547,10 @@ export default function UpdatePO() {
                 />
               </div>
 
-              <div className="form-button-container">
-                <button type="submit">Get Data</button>
+              <div className="update-po-button-container">
+                <button type="submit" className="update-po-submit-btn">
+                  Get Data
+                </button>
               </div>
             </div>
           </form>
@@ -545,7 +559,7 @@ export default function UpdatePO() {
           <form onSubmit={handleUpdate}>
             {/* {searchData.pono && ( */}
             <>
-              <div className="only-input-styles">
+              <div className="update-po-input-styles">
                 <div>
                   <div className="datePickerContainer">
                     <Space direction="vertical">
@@ -906,8 +920,10 @@ export default function UpdatePO() {
               <div>
                 <p>{success}</p>
               </div>
-              <div className="form-button-container">
-                <button type="submit">Update</button>
+              <div className="update-po-button-container">
+                <button type="submit" className="update-po-submit-btn">
+                  Update
+                </button>
               </div>
             </>
             {/* )} */}

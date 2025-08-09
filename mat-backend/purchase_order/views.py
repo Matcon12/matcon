@@ -146,8 +146,8 @@ def submit_form(request):
             
             logger.info(f"Processing form with location: {location}")
             
-            formData['poDate'] = datetime.strptime(formData.get('poDate', ''), '%d-%m-%Y').strftime('%Y-%m-%d') if formData['poDate'] else None
-            formData['poValidity'] = datetime.strptime(formData.get('poValidity', ''), '%d-%m-%Y').strftime('%Y-%m-%d') if formData['poValidity'] else None
+            formData['poDate'] = convert_date_format(formData.get('poDate')) if formData.get('poDate') else None
+            formData['poValidity'] = convert_date_format(formData.get('poValidity')) if formData.get('poValidity') else None
 
             with transaction.atomic():
                 for product in productDetails:
@@ -158,9 +158,7 @@ def submit_form(request):
                     max_slno = CustomerPurchaseOrder.objects.aggregate(Max('slno'))['slno__max']
                     new_slno = max_slno + 1 if max_slno else 1
 
-                    delivery_date = product.get('deliveryDate', None)
-                    if delivery_date:
-                        delivery_date = datetime.strptime(delivery_date, '%d-%m-%Y').strftime('%Y-%m-%d')
+                    delivery_date = convert_date_format(product.get('deliveryDate')) if product.get('deliveryDate') else None
 
                     # Handle kit products vs regular products
                     prod_code = product.get('prodId', '')
@@ -308,6 +306,10 @@ def get_data_po_cust(request):
 
     
 def convert_date_format(date_str):
+    # Handle empty strings, null, or None values
+    if not date_str or date_str.strip() == "":
+        return None
+    
     # Parse the date string into a datetime object
     date_obj = datetime.strptime(date_str, '%d-%m-%Y')
     # Convert the datetime object into the desired format
@@ -327,10 +329,11 @@ def validate_common_columns(search_data):
     # Validate date formats if present
     date_fields = ['podate', 'po_validity']
     for field in date_fields:
-        if search_data.get(field):
+        field_value = search_data.get(field)
+        if field_value and field_value.strip() != "":
             try:
                 # Try to parse the date to ensure it's valid
-                datetime.strptime(search_data.get(field), '%d-%m-%Y')
+                datetime.strptime(field_value, '%d-%m-%Y')
             except ValueError:
                 return False, f"Invalid date format for {field}. Expected format: DD-MM-YYYY"
     
@@ -393,12 +396,16 @@ def update_purchase_order(request):
                 for key, value in search_data.items():
                     if hasattr(main_record, key):
                         # Convert date fields before setting
-                        if key in ['podate', 'po_validity', 'delivery_date'] and value:
-                            try:
-                                converted_value = convert_date_format(value)
-                                setattr(main_record, key, converted_value)
-                            except ValueError as e:
-                                return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                        if key in ['podate', 'po_validity', 'delivery_date']:
+                            if value and value.strip() != "":
+                                try:
+                                    converted_value = convert_date_format(value)
+                                    setattr(main_record, key, converted_value)
+                                except ValueError as e:
+                                    return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                            else:
+                                # Set null for empty date fields
+                                setattr(main_record, key, None)
                         else:
                             setattr(main_record, key, value)
                 main_record.save()
@@ -428,12 +435,16 @@ def update_purchase_order(request):
                         for key, value in kit_item.items():
                             if key in product_specific_fields and hasattr(kit_record, key):
                                 # Convert date fields for kit records too
-                                if key == 'delivery_date' and value:
-                                    try:
-                                        converted_value = convert_date_format(value)
-                                        setattr(kit_record, key, converted_value)
-                                    except ValueError as e:
-                                        return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                if key == 'delivery_date':
+                                    if value and value.strip() != "":
+                                        try:
+                                            converted_value = convert_date_format(value)
+                                            setattr(kit_record, key, converted_value)
+                                        except ValueError as e:
+                                            return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                    else:
+                                        # Set null for empty date fields
+                                        setattr(kit_record, key, None)
                                 else:
                                     setattr(kit_record, key, value)
 
@@ -445,12 +456,16 @@ def update_purchase_order(request):
                             update_fields = {}
                             for key, value in kit_item.items():
                                 if key in product_specific_fields and hasattr(kit_record, key):
-                                    if key == 'delivery_date' and value:
-                                        try:
-                                            converted_value = convert_date_format(value)
-                                            update_fields[key] = converted_value
-                                        except ValueError as e:
-                                            return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                    if key == 'delivery_date':
+                                        if value and value.strip() != "":
+                                            try:
+                                                converted_value = convert_date_format(value)
+                                                update_fields[key] = converted_value
+                                            except ValueError as e:
+                                                return JsonResponse({'error': f"Invalid date format for {key}: {value}. Expected DD-MM-YYYY format."}, status=400)
+                                        else:
+                                            # Set null for empty date fields
+                                            update_fields[key] = None
                                     else:
                                         update_fields[key] = value
                             
@@ -1186,8 +1201,52 @@ def invoice_processing(request):
     df_inw["qty_tobe_del_numeric"] = df_inw["qty_tobe_del"].apply(safe_float_conversion)
     
     # Calculate new quantities
-    df_inw["qty_sent"] = df_inw["qty_sent_numeric"] + df_inw["qty_tobe_del_numeric"]
-    df_inw["qty_balance"] = df_inw["qty_balance_numeric"] - df_inw["qty_tobe_del_numeric"]
+    # For kit components, we need to use the original frontend quantity (number_of_packs) * pack_size
+    # For regular products, use the calculated qty_tobe_del_numeric
+    for index, row in df_inw.iterrows():
+        po_sl_no = row['po_sl_no']
+        is_kit_component = po_sl_no and '.' in po_sl_no  # Kit components have po_sl_no like "2.1", "2.2"
+        
+        if is_kit_component:
+            # For kit components, qty_tobe_del now contains the actual quantity (number_of_packs * pack_size)
+            # We need to calculate number_of_packs for DC display and use actual_qty for balance calculations
+            actual_qty = row.get('qty_tobe_del', 0)  # This is now the actual quantity from frontend
+            pack_size_raw = row.get('pack_size', 1) or 1
+            
+            # Extract numeric value from pack_size
+            if isinstance(pack_size_raw, str):
+                import re
+                pack_size_match = re.search(r'(\d+(?:\.\d+)?)', str(pack_size_raw))
+                if pack_size_match:
+                    pack_size = float(pack_size_match.group(1))
+                else:
+                    pack_size = 1.0
+            else:
+                pack_size = float(pack_size_raw)
+            
+            # Extract numeric value from actual_qty
+            if isinstance(actual_qty, str):
+                import re
+                numeric_match = re.search(r'(\d+(?:\.\d+)?)', str(actual_qty))
+                if numeric_match:
+                    actual_qty = float(numeric_match.group(1))
+                else:
+                    actual_qty = 0.0
+            else:
+                actual_qty = float(actual_qty)
+            
+            # Calculate number_of_packs for DC display: actual_qty / pack_size
+            number_of_packs = actual_qty / pack_size if pack_size > 0 else actual_qty
+            
+            print(f"Kit component {po_sl_no}: actual_qty={actual_qty}, pack_size={pack_size}, number_of_packs={number_of_packs}")
+            
+            # Update qty_sent and qty_balance for kit components using actual_qty
+            df_inw.at[index, "qty_sent"] = row["qty_sent_numeric"] + actual_qty
+            df_inw.at[index, "qty_balance"] = row["qty_balance_numeric"] - actual_qty
+        else:
+            # For regular products, use the existing calculation
+            df_inw.at[index, "qty_sent"] = row["qty_sent_numeric"] + row["qty_tobe_del_numeric"]
+            df_inw.at[index, "qty_balance"] = row["qty_balance_numeric"] - row["qty_tobe_del_numeric"]
     
     # return JsonResponse({"df_inw": df_inw.to_dict()})
     
@@ -1432,19 +1491,29 @@ def invoice_generation(request):
                 # Check if this is a kit component (po_sl_no contains a dot)
                 is_kit_component = instance.po_sl_no and '.' in instance.po_sl_no
                 
-                # For both regular products and kit components, calculate number_of_packs = qty_delivered / pack_size
                 import re
                 pack_size_str = str(instance.pack_size) if instance.pack_size else "1"
                 match = re.search(r"(\d+(?:\.\d+)?)", pack_size_str)
                 pack_size = float(match.group(1)) if match else 1.0
-                if pack_size > 0:
-                    number_of_packs = qty_delivered / pack_size
-                else:
-                    number_of_packs = qty_delivered
                 
                 if is_kit_component:
+                    # For kit components: qty_delivered represents the actual quantity delivered
+                    # Calculate number_of_packs = qty_delivered / pack_size
+                    if pack_size > 0:
+                        number_of_packs = qty_delivered / pack_size
+                        # Round to 2 decimal places for kit components
+                        number_of_packs = round(number_of_packs, 2)
+                    else:
+                        number_of_packs = qty_delivered
+                    
                     print(f"Kit component {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
                 else:
+                    # For regular products: calculate number_of_packs = qty_delivered / pack_size
+                    if pack_size > 0:
+                        number_of_packs = qty_delivered / pack_size
+                    else:
+                        number_of_packs = qty_delivered
+                    
                     print(f"Regular product {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
             except (ValueError, TypeError):
                 number_of_packs = 0
@@ -1464,7 +1533,7 @@ def invoice_generation(request):
                 'hsn': instance.hsn_sac,
                 'batch': instance.batch,
                 'coc': instance.coc,
-                'qty_delivered': instance.qty_delivered,
+                'qty_delivered': str(qty_delivered) if is_kit_component else instance.qty_delivered,
                 'number_of_packs': round(number_of_packs, 2),  # Add number of packs field
                 'pack_size': instance.pack_size,
                 'unit_price': instance.unit_price,
@@ -1640,6 +1709,7 @@ def get_invoice_data(request):
                         'hsnSac': item['hsn_sac'],
                         'qty_balance': item['qty_balance'],
                         'pack_size': item.get('pack_size', ''),
+                        'uom': item.get('uom', 'units'),
                         'location': item.get('location', 'HBL')
                     }
                     for item in result_data
@@ -2147,6 +2217,7 @@ def outstanding_PO(request):
 
                 data.append({
                     'Sl. No.': index,  # Keep as integer
+                    'Location': po.location,
                     'Cust ID': po.cust.cust_id if po.cust else '',
                     'Customer Name': po.cust.cust_name,
                     'PO No.': po.pono,
@@ -2165,6 +2236,7 @@ def outstanding_PO(request):
             # Add a new row for the totals
             data.append({
                 'Sl. No.': 'Total',
+                'Location': '',
                 'Cust ID': '',
                 'Customer Name': '',
                 'PO No.': '',

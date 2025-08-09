@@ -12,9 +12,12 @@ export default function InvoiceReportInput() {
   })
 
   const handleDateChange = (field) => (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+
     setFormData((prev) => ({
       ...prev,
-      [field]: dateString,
+      [field]: value,
     }))
   }
 

@@ -10,6 +10,7 @@ import {
   faTrash,
   faArrowsRotate,
   faPlus,
+  faSpinner,
 } from "@fortawesome/free-solid-svg-icons"
 
 import "react-toastify/dist/ReactToastify.css"
@@ -42,6 +43,7 @@ export default function Invoice() {
   const [customerData, setCustomerData] = useState([])
   const [purchaseOrderDetails, setPurchaseOrderDetails] = useState([])
   const [poSlNo, setPoSlNo] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const navigate = useNavigate()
 
@@ -157,6 +159,7 @@ export default function Invoice() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
     try {
       // Validate kit component quantities
@@ -203,13 +206,34 @@ export default function Invoice() {
 
           // Add kit component data if this is a kit product
           if (entry.kitData && entry.kitData.length > 0) {
-            baseEntry.kitComponents = entry.kitData.map((kitItem) => ({
-              po_sl_no: kitItem.po_sl_no,
-              prod_desc: kitItem.prod_desc,
-              hsnSac: kitItem.hsnSac || "",
-              unit_price: kitItem.unit_price,
-              quantity: kitItem.quantity || 0,
-            }))
+            baseEntry.kitComponents = entry.kitData.map((kitItem) => {
+              // For kit components, calculate actual quantity as number_of_packs * pack_size
+              const number_of_packs = parseFloat(kitItem.quantity) || 0
+              const pack_size_raw = kitItem.pack_size || "1"
+
+              // Extract numeric value from pack_size
+              const pack_size_match = pack_size_raw
+                .toString()
+                .match(/(\d+(?:\.\d+)?)/)
+              const pack_size = pack_size_match
+                ? parseFloat(pack_size_match[1])
+                : 1.0
+
+              // Calculate actual quantity for kit components
+              const actual_quantity = number_of_packs * pack_size
+
+              console.log(
+                `Kit component ${kitItem.po_sl_no}: number_of_packs=${number_of_packs}, pack_size=${pack_size}, actual_quantity=${actual_quantity}`
+              )
+
+              return {
+                po_sl_no: kitItem.po_sl_no,
+                prod_desc: kitItem.prod_desc,
+                hsnSac: kitItem.hsnSac || "",
+                unit_price: kitItem.unit_price,
+                quantity: actual_quantity, // Send actual quantity (number_of_packs * pack_size)
+              }
+            })
 
             // For kit products, we don't need batch data since components are handled separately
             baseEntry.isKitProduct = true
@@ -323,9 +347,13 @@ export default function Invoice() {
             toast.error("An error occurred while processing the invoice")
           }
         })
+        .finally(() => {
+          setIsSubmitting(false)
+        })
     } catch (error) {
       console.log("Validation error:", error.message)
       toast.error(error.message)
+      setIsSubmitting(false)
     }
   }
 
@@ -378,6 +406,7 @@ export default function Invoice() {
           newEntries[entryIndex].qty_balance = matchingItem.qty_balance || 0
           newEntries[entryIndex].unit_price = matchingItem.unit_price || 0
           newEntries[entryIndex].pack_size = matchingItem.pack_size || ""
+          newEntries[entryIndex].uom = matchingItem.uom || "units"
 
           // Check if this is a kit product
           const isKit =
@@ -397,9 +426,15 @@ export default function Invoice() {
               purchaseOrderDetails.map((item) => ({
                 po_sl_no: item.po_sl_no,
                 prod_desc: item.prod_desc,
+                uom: item.uom,
               }))
             )
-            newEntries[entryIndex].kitData = kitProducts
+            // Ensure each kit component has its UOM stored
+            const kitProductsWithUOM = kitProducts.map((kitProduct) => ({
+              ...kitProduct,
+              uom: kitProduct.uom || "units",
+            }))
+            newEntries[entryIndex].kitData = kitProductsWithUOM
             newEntries[entryIndex].isKit = true
           } else {
             newEntries[entryIndex].isKit = false
@@ -600,12 +635,22 @@ export default function Invoice() {
     return "high-stock"
   }
 
+  const getUOMWithFallback = (item) => {
+    return item?.uom || "units"
+  }
+
+  const formatBalance = (balance) => {
+    const numBalance = parseFloat(balance) || 0
+    return numBalance.toFixed(2)
+  }
+
   const getRemainingBalance = (kitItem) => {
     const balance = parseFloat(kitItem.qty_balance) || 0
     const quantity = parseFloat(kitItem.quantity) || 0
     const packSize = parseFloat(kitItem.pack_size) || 1
     const actualQuantity = quantity * packSize
-    return Math.max(0, balance - actualQuantity)
+    const remaining = Math.max(0, balance - actualQuantity)
+    return remaining.toFixed(2)
   }
 
   const getNonKitRemainingBalance = (entry, fieldIndex) => {
@@ -613,7 +658,8 @@ export default function Invoice() {
     const quantity = parseFloat(entry.quantities[fieldIndex]) || 0
     const packSize = parseFloat(entry.pack_size) || 1
     const actualQuantity = quantity * packSize
-    return Math.max(0, balance - actualQuantity)
+    const remaining = Math.max(0, balance - actualQuantity)
+    return remaining.toFixed(2)
   }
 
   const resetForm = () => {
@@ -980,7 +1026,9 @@ export default function Invoice() {
                                           entry.qty_balance
                                         )}`}
                                       >
-                                        Balance: {entry.qty_balance || 0} units
+                                        Balance:{" "}
+                                        {formatBalance(entry.qty_balance)}{" "}
+                                        {getUOMWithFallback(entry)}
                                         {quantity &&
                                           parseFloat(quantity) > 0 && (
                                             <span className="remaining-balance">
@@ -1097,8 +1145,9 @@ export default function Invoice() {
                                           kitItem.qty_balance
                                         )}`}
                                       >
-                                        Balance: {kitItem.qty_balance || 0}{" "}
-                                        units
+                                        Balance:{" "}
+                                        {formatBalance(kitItem.qty_balance)}{" "}
+                                        {getUOMWithFallback(kitItem)}
                                         {kitItem.quantity &&
                                           parseFloat(kitItem.quantity) > 0 && (
                                             <span className="remaining-balance">
@@ -1110,25 +1159,6 @@ export default function Invoice() {
                                       </span>
                                     </div>
                                     <div className="kit-component-fields">
-                                      <div className="kit-component-hsn">
-                                        <input
-                                          type="text"
-                                          name={`kit-hsn-${kitIndex}`}
-                                          value={kitItem.hsnSac || ""}
-                                          onChange={(e) =>
-                                            handleKitComponentFieldChange(
-                                              entryIndex,
-                                              kitIndex,
-                                              "hsnSac",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder=" "
-                                          onFocus={handleKitInputFocus}
-                                          onBlur={handleKitInputBlur}
-                                        />
-                                        <label>HSN/SAC</label>
-                                      </div>
                                       <div className="kit-component-quantity">
                                         <input
                                           type="number"
@@ -1149,6 +1179,25 @@ export default function Invoice() {
                                         />
                                         <label>Quantity</label>
                                       </div>
+                                      <div className="kit-component-hsn">
+                                        <input
+                                          type="text"
+                                          name={`kit-hsn-${kitIndex}`}
+                                          value={kitItem.hsnSac || ""}
+                                          onChange={(e) =>
+                                            handleKitComponentFieldChange(
+                                              entryIndex,
+                                              kitIndex,
+                                              "hsnSac",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder=" "
+                                          onFocus={handleKitInputFocus}
+                                          onBlur={handleKitInputBlur}
+                                        />
+                                        <label>HSN/SAC</label>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -1160,7 +1209,15 @@ export default function Invoice() {
                   </div>
                 ))}
               <div className="submit-button">
-                <button type="submit">Submit</button>
+                <button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin /> Processing...
+                    </>
+                  ) : (
+                    "Submit"
+                  )}
+                </button>
               </div>
             </div>
           )}

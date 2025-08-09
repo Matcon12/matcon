@@ -123,11 +123,25 @@ a {
 
 .card__form button {
   border: 0;
-  background: #111;
+  background: var(--primary-color);
   color: #fff;
-  padding: 0.68em;
-  border-radius: 14px;
-  font-weight: bold;
+  padding: 0.8em 2em;
+  border-radius: 1.25em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.card__form button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.card__form button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .sign-up:hover {
@@ -136,17 +150,30 @@ a {
 
 /* printing dc challan */
 .dc-print-container {
-  margin: 20mm;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .dc-report-container {
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 100%;
 }
 
 .dc-report {
   width: 600px;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid black;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .dc-report > h2 {
@@ -161,10 +188,12 @@ a {
 
 .to-address {
   flex: 1;
+  text-align: left !important;
 }
 
 .message {
   width: 100%;
+  text-align: left !important;
 }
 
 .signature {
@@ -194,11 +223,38 @@ a {
     overflow: initial !important;
     -webkit-print-color-adjust: exact;
   }
+
+  /* Ensure DC container is centered during print */
+  .dc-print-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 0; /* Remove top padding since we have page margin */
+    padding-bottom: 0; /* Remove bottom padding since we have page margin */
+  }
+
+  .dc-report-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+  }
+
+  /* Center all content within the DC */
+  .dc-report > * {
+    text-align: center;
+  }
+
+  /* Ensure tables are properly centered */
+  table {
+    margin: 0 auto;
+  }
 }
 
 @media print {
   .page-break {
-    margin-top: 1rem;
+    margin-top: 2rem; /* Reduced margin since we have page margins */
     display: block;
     page-break-before: auto;
     break-inside: avoid;
@@ -207,5 +263,5 @@ a {
 
 @page {
   size: auto;
-  margin: 40mm 0;
+  margin: 4cm 2cm 3cm 2cm; /* Top, Right, Bottom, Left margins for printer headers/footers */
 }

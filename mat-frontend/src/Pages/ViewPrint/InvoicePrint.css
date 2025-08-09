@@ -1,3 +1,163 @@
+/* Main container styling */
+.invoice-report-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.reports-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+}
+
+.reports-header h2 {
+  margin: 0;
+  font-size: 1.8em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.preview-section {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.document-card {
+  width: 80%;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
+
+.document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.document-header h3 {
+  margin: 0;
+  font-size: 1.3em;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.print-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.print-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.document-preview {
+  padding: 10px 20px 20px 20px;
+  background: #fafbfc;
+  min-height: 400px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.scaled-document {
+  transform: scale(0.7);
+  transform-origin: top center;
+  width: 142.86%; /* 100% / 0.7 to maintain proper width after scaling */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 0;
+}
+
+/* DC container for screen view - override print styles */
+.dc-container-container {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: block !important;
+  min-height: auto !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  height: auto !important;
+}
+
+/* Ensure DC inside scaled document has proper spacing */
+.scaled-document .dc-container-container {
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.scaled-document .dc-container {
+  margin: 0 !important;
+  padding: 10px 15px !important;
+  min-height: auto !important;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.skeleton-button {
+  width: 120px;
+  height: 40px;
+  background: linear-gradient(90deg, #e9ecef 25%, #f8f9fa 50%, #e9ecef 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+.skeleton-preview {
+  background: #f1f3f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.skeleton-content {
+  width: 70%;
+  height: 350px;
+  background: linear-gradient(90deg, #e9ecef 25%, #f8f9fa 50%, #e9ecef 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .input-details-container {
   display: flex;
   flex-direction: column;
@@ -54,36 +214,98 @@ h3 {
 } */
 
 @media print {
-  @page:first {
-      margin-top: 5cm;
-      margin-bottom: 1cm;
-      margin-left: 2cm;
-      margin-right: 1cm;
+  @page: first {
+    margin-top: 4cm; /* Reduced top margin for company header */
+    margin-bottom: 3cm; /* Bottom margin for company footer */
+    margin-left: 2cm;
+    margin-right: 1cm;
   }
 
   @page {
-      margin: 1cm; /* Default margins for other pages */
-      margin-left: 2cm;
-      @top-center {
-          content: "";
-      }
-      @bottom-center {
-          content: "";
-      }
-      @bottom-left {
-          content: "";
-      }
-      @bottom-right {
-          content: "Page " counter(page) " of " counter(pages);
-      }
+    margin: 1cm; /* Default margins for other pages */
+    margin-top: 4cm; /* Top margin for company header on all pages */
+    margin-bottom: 3cm; /* Bottom margin for company footer on all pages */
+    margin-left: 2cm;
+    @top-center {
+      content: "";
+    }
+    @bottom-center {
+      content: "";
+    }
+    @bottom-left {
+      content: "";
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+    }
   }
-                                                                                         
-  body,                                                                                      
-  .invoice-report-container,                                                                 
-  .invoice-container {                                                                       
-    background-color: transparent;                                                           
-    color: black;                                                                            
-  }               
+
+  body,
+  .invoice-report-container,
+  .invoice-container {
+    background-color: transparent;
+    color: black;
+  }
+
+  /* Ensure invoice container is centered during print */
+  .invoice-container-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* Keep content at the top during print */
+    width: 100%;
+    min-height: 100vh; /* Ensure full height during print */
+    padding-top: 0; /* Remove top padding since we have page margin */
+    padding-bottom: 0; /* Remove bottom padding since we have page margin */
+  }
+
+  .invoice-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+    align-self: flex-start; /* Ensure container stays at the top during print */
+  }
+
+  /* Center all content within the invoice */
+  .invoice-container > * {
+    text-align: left; /* Left align instead of center */
+  }
+
+  /* Ensure tables are properly left-aligned */
+  table {
+    margin: 0; /* Remove auto margin to prevent centering */
+  }
+
+  /* Keep headings left-aligned */
+  h3 {
+    text-align: left !important;
+  }
+
+  /* Keep column content left-aligned */
+  .column {
+    justify-items: start !important;
+  }
+
+  /* DC container styles for proper centering */
+  .dc-container-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 0; /* Remove top padding since we have page margin */
+    padding-bottom: 0; /* Remove bottom padding since we have page margin */
+  }
+
+  .dc-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+  }
+
+  /* Center all content within the DC */
+  .dc-container > * {
+    text-align: center;
+  }
 }
 
 /*
@@ -132,3 +354,33 @@ h3 {
   }
 }
 */
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .invoice-report-container {
+    padding: 15px;
+  }
+
+  .document-card {
+    width: 95%;
+  }
+
+  .document-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .scaled-document {
+    transform: scale(0.5);
+    width: 200%; /* 100% / 0.5 */
+  }
+
+  .reports-header h2 {
+    font-size: 1.4em;
+  }
+
+  .preview-section {
+    gap: 20px;
+  }
+}

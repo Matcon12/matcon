@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import "./Customer.css"
 import possibleValues from "../../../../data.js"
-import { DatePicker, Space } from "antd"
+import { DatePicker, Space, Spin, Alert } from "antd"
 import dayjs from "dayjs"
 import ProductDetails from "../../../reuse/ProductDetails/ProductDetails.jsx"
 import { Link } from "react-router-dom"
@@ -24,19 +24,38 @@ export default function Customer() {
   const [filteredPurchaseData, setFilteredPurchaseData] = useState()
   const [filteredSuggestions, setFilteredSuggestions] = useState()
 
+  // UX Improvement: Loading states
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formErrors, setFormErrors] = useState({})
+
   useEffect(() => {
-    api.get("/getCustomerData").then((response) => {
-      setCustomerData(response.data.customerData)
-      setConsigneeData(response.data.customerData)
-    })
-    api.get("/getPurchaseOrder").then((response) => {
-      setPurchaseOrder(response.data.distinct_pono)
-      console.log("PO: ", response.data.distinct_pono)
-    })
-    api.get("/getProductCodes").then((response) => {
-      setSuggestions(response.data.prod_code)
-      console.log("product codes: ", response.data.prod_code)
-    })
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true)
+        const [customerResponse, poResponse, productResponse] =
+          await Promise.all([
+            api.get("/getCustomerData"),
+            api.get("/getPurchaseOrder"),
+            api.get("/getProductCodes"),
+          ])
+
+        setCustomerData(customerResponse.data.customerData)
+        setConsigneeData(customerResponse.data.customerData)
+        setPurchaseOrder(poResponse.data.distinct_pono)
+        setSuggestions(productResponse.data.prod_code)
+
+        console.log("PO: ", poResponse.data.distinct_pono)
+        console.log("product codes: ", productResponse.data.prod_code)
+      } catch (error) {
+        toast.error("Failed to load initial data. Please refresh the page.")
+        console.error("Error loading initial data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadInitialData()
   }, [])
 
   const initialFormData = {
@@ -68,6 +87,70 @@ export default function Customer() {
   const [formData, setFormData] = useState(initialFormData)
   const [productDetails, setProductDetails] = useState([initialProductDetails])
 
+  // UX Improvement: Enhanced validation
+  const validateForm = () => {
+    const errors = {}
+
+    if (!formData.customerId) {
+      errors.customerId = "Customer ID is required"
+    }
+    if (!formData.poNo) {
+      errors.poNo = "PO Number is required"
+    }
+    if (!formData.poDate) {
+      errors.poDate = "PO Date is required"
+    }
+    if (!formData.location) {
+      errors.location = "Location is required"
+    }
+
+    // Validate product details
+    const productErrors = []
+    productDetails.forEach((product, index) => {
+      const hasAnyData = product.prodId || product.productDesc
+      if (!hasAnyData) return // Skip empty products
+
+      const productError = {}
+      if (!product.prodId || product.prodId.trim() === "") {
+        productError.prodId = "Product Code is required"
+      }
+
+      const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
+
+      if (isKitComponent) {
+        if (!product.quantity || product.quantity <= 0) {
+          productError.quantity =
+            "Valid quantity is required for kit components"
+        }
+        if (
+          product.unitPrice !== 0 &&
+          product.unitPrice !== "" &&
+          product.unitPrice !== null
+        ) {
+          productError.unitPrice = "Unit price must be 0 for kit components"
+        }
+      } else {
+        if (!product.quantity || product.quantity <= 0) {
+          productError.quantity = "Valid quantity is required"
+        }
+        if (!product.unitPrice || product.unitPrice <= 0) {
+          productError.unitPrice = "Valid unit price is required"
+        }
+      }
+
+      if (Object.keys(productError).length > 0) {
+        productErrors[index] = productError
+      }
+    })
+
+    if (productErrors.length > 0) {
+      errors.products = productErrors
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   // -------------------------------Changes by TJ --------------------------
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -75,6 +158,14 @@ export default function Customer() {
       ...prevFormData,
       [name]: name === "poNo" ? value.trim() : value, //Trimming all spaces
     }))
+
+    // Clear error when user starts typing
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: null,
+      }))
+    }
   }
 
   const handleProductChange = (key, event) => {
@@ -87,6 +178,17 @@ export default function Customer() {
       }
     }
 
+    // Format numbers to 2 decimal places on blur
+    if (
+      event.type === "blur" &&
+      ["totalPrice", "quantity", "unitPrice"].includes(name)
+    ) {
+      const numValue = parseFloat(value)
+      if (!isNaN(numValue)) {
+        event.target.value = numValue.toFixed(2)
+      }
+    }
+
     console.log(key, name, value)
     setProductDetails(
       productDetails.map((productDetail, index) => {
@@ -96,7 +198,11 @@ export default function Customer() {
           // Convert numeric fields to numbers, but handle empty values properly
           if (["totalPrice", "quantity", "unitPrice"].includes(name)) {
             const numValue = parseFloat(value)
-            processedValue = isNaN(numValue) ? "" : numValue
+            if (!isNaN(numValue)) {
+              processedValue = numValue // Don't format to 2 decimals on change, only on blur
+            } else {
+              processedValue = ""
+            }
           }
 
           // Check if this is a kit component (po_sl_no contains a dot like "2.1", "2.2")
@@ -119,88 +225,39 @@ export default function Customer() {
         return productDetail
       })
     )
+
+    // Clear product errors when user starts typing
+    if (
+      formErrors.products &&
+      formErrors.products[key] &&
+      formErrors.products[key][name]
+    ) {
+      setFormErrors((prev) => ({
+        ...prev,
+        products: {
+          ...prev.products,
+          [key]: {
+            ...prev.products[key],
+            [name]: null,
+          },
+        },
+      }))
+    }
   }
   // ------------------------------- End of Changes ------------------------
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
-    // Validate required fields
-    if (
-      !formData.customerId ||
-      !formData.poNo ||
-      !formData.poDate ||
-      !formData.location
-    ) {
-      toast.error(
-        "Please fill in all required fields (Customer ID, PO No, PO Date, Location)"
-      )
+    if (!validateForm()) {
+      toast.error("Please fix the errors before submitting")
       return
-    }
-
-    // Validate product details
-    if (!productDetails || productDetails.length === 0) {
-      toast.error("Please add at least one product")
-      return
-    }
-
-    // Validate each product has required fields
-    for (let i = 0; i < productDetails.length; i++) {
-      const product = productDetails[i]
-      console.log(`Product ${i + 1} data:`, product)
-
-      // Skip validation for completely empty products (they will be filtered out)
-      const hasAnyData = product.prodId || product.productDesc
-      if (!hasAnyData) {
-        continue
-      }
-
-      // Check if required fields are missing or empty
-      if (!product.prodId || product.prodId.trim() === "") {
-        toast.error(`Please enter Product Code for product ${i + 1}`)
-        return
-      }
-
-      // Check if this is a kit component (po_sl_no contains a dot like "2.1", "2.2")
-      const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
-
-      // For kit components, require quantity but unit price must be 0
-      if (isKitComponent) {
-        if (!product.quantity || product.quantity <= 0) {
-          toast.error(`Please enter a valid Quantity for product ${i + 1}`)
-          return
-        }
-        // For kit components, ensure unit price is 0 or empty
-        if (
-          product.unitPrice !== 0 &&
-          product.unitPrice !== "" &&
-          product.unitPrice !== null
-        ) {
-          toast.error(
-            `Unit price must be 0 for kit components (product ${i + 1})`
-          )
-          return
-        }
-      } else {
-        // For regular products and main kit products, require both quantity and unit price
-        if (!product.quantity || product.quantity <= 0) {
-          toast.error(`Please enter a valid Quantity for product ${i + 1}`)
-          return
-        }
-
-        if (!product.unitPrice || product.unitPrice <= 0) {
-          toast.error(`Please enter a valid Unit Price for product ${i + 1}`)
-          return
-        }
-      }
     }
 
     // Filter out empty products before submission
     const validProductDetails = productDetails.filter((product) => {
-      // Check if this is a kit component
       const isKitComponent = product.poSlNo && product.poSlNo.includes(".")
 
-      // For kit components, require product code and quantity (no unit price requirement)
       if (product.prodId && isKitComponent) {
         return (
           product.prodId.trim() !== "" &&
@@ -209,7 +266,6 @@ export default function Customer() {
         )
       }
 
-      // For regular products and main kit products, require all fields including unit price
       return (
         product.prodId &&
         product.prodId.trim() !== "" &&
@@ -238,34 +294,46 @@ export default function Customer() {
       productDetails: finalProductDetails,
     })
 
-    // Submit the form
-    api
-      .post("/submitForm", {
+    // Submit the form with loading state
+    try {
+      setIsSubmitting(true)
+      const response = await api.post("/submitForm", {
         formData: formData,
         productDetails: finalProductDetails,
       })
-      .then((response) => {
-        console.log(response.data)
-        toast.success(`PO No: ${formData.poNo} created successfully`)
-        resetForm()
-      })
-      .catch((error) => {
-        toast.error("ERROR: Invalid/Missing Input Data")
-        console.log(
-          "API Error:",
-          error?.response?.data?.error || error?.message || "Unknown error"
-        )
-        return
-      })
+
+      console.log(response.data)
+      toast.success(`PO No: ${formData.poNo} created successfully`)
+      resetForm()
+    } catch (error) {
+      toast.error("ERROR: Invalid/Missing Input Data")
+      console.log(
+        "API Error:",
+        error?.response?.data?.error || error?.message || "Unknown error"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const resetForm = () => {
     setFormData(initialFormData)
     setProductDetails([initialProductDetails])
     setIsKit([1])
+    setFormErrors({})
   }
 
   const onDateChange = (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    if (!dateString || dateString.trim() === "") {
+      setFormData((prevFormData) => ({
+        ...prevFormData,
+        poDate: null,
+        poValidity: null,
+      }))
+      return
+    }
+
     const parsedDate = parse(dateString, "dd-MM-yyyy", new Date())
     const validityDate = addYears(parsedDate, 1)
     const formattedValidityDate = format(validityDate, "dd-MM-yyyy")
@@ -275,16 +343,43 @@ export default function Customer() {
       poDate: dateString,
       poValidity: formattedValidityDate,
     }))
+
+    // Clear date error
+    if (formErrors.poDate) {
+      setFormErrors((prev) => ({
+        ...prev,
+        poDate: null,
+      }))
+    }
   }
 
   const onValidityChange = (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+
     setFormData((prevFormData) => ({
       ...prevFormData,
-      poValidity: dateString,
+      poValidity: value,
     }))
   }
 
   const onProductDateChange = (date, index, dateStr) => {
+    // Handle empty string or null values when user clears the date
+    if (!dateStr || dateStr.trim() === "") {
+      setProductDetails(
+        productDetails.map((productDetail, idx) => {
+          if (idx === index) {
+            return {
+              ...productDetail,
+              deliveryDate: null,
+            }
+          }
+          return productDetail
+        })
+      )
+      return
+    }
+
     const parsedPoDate = parse(formData.poDate, "dd-MM-yyyy", new Date())
     const formattedPoDate = format(parsedPoDate, "dd-MM-yyyy")
     const parsedDeliveryDate = parse(dateStr, "dd-MM-yyyy", new Date())
@@ -295,12 +390,18 @@ export default function Customer() {
         if (idx === index) {
           return {
             ...productDetail,
-            deliveryDate: parsedPoDate <= parsedDeliveryDate ? dateStr : "",
+            deliveryDate: parsedPoDate <= parsedDeliveryDate ? dateStr : null,
           }
         }
         return productDetail
       })
     )
+  }
+
+  // Utility function to format numbers to 2 decimal places
+  const formatToTwoDecimals = (value) => {
+    const num = parseFloat(value)
+    return isNaN(num) ? "0.00" : num.toFixed(2)
   }
 
   const setTotal = (total, index) => {
@@ -309,7 +410,7 @@ export default function Customer() {
       setProductDetails(
         productDetails.map((productDetail) => {
           if (productDetails.indexOf(productDetail) == index) {
-            return { ...productDetail, ["totalPrice"]: parsedTotal }
+            return { ...productDetail, ["totalPrice"]: parsedTotal.toFixed(2) }
           }
           return productDetail
         })
@@ -329,14 +430,69 @@ export default function Customer() {
   }
 
   const handleProductDelete = (index) => {
-    setProductDetails(
-      productDetails.filter((productDetail, idx) => idx !== index)
-    )
-    setIsKit((prevArray) => {
-      const newArray = [...prevArray]
-      newArray.splice(index, 1)
-      return newArray
-    })
+    const productToDelete = productDetails[index]
+
+    // Check if this is a main kit product
+    const isMainKit =
+      productToDelete.prodId &&
+      productToDelete.prodId.toLowerCase().includes("kit") &&
+      productToDelete.poSlNo &&
+      !productToDelete.poSlNo.includes(".")
+
+    if (isMainKit) {
+      // Get the main kit's po_sl_no (e.g., "2")
+      const mainKitPoSlNo = productToDelete.poSlNo
+
+      // Find all kit components that belong to this main kit
+      const indicesToDelete = productDetails
+        .map((product, idx) => {
+          // Check if this is a component of the main kit being deleted
+          const isComponent =
+            product.poSlNo &&
+            product.poSlNo.startsWith(mainKitPoSlNo + ".") &&
+            product.poSlNo !== mainKitPoSlNo
+          return isComponent ? idx : null
+        })
+        .filter((idx) => idx !== null)
+
+      // Add the main kit index to the list of indices to delete
+      indicesToDelete.push(index)
+
+      // Sort indices in descending order to avoid index shifting issues
+      indicesToDelete.sort((a, b) => b - a)
+
+      // Delete all related products
+      let updatedProductDetails = [...productDetails]
+      let updatedIsKit = [...isKit]
+
+      indicesToDelete.forEach((idx) => {
+        updatedProductDetails.splice(idx, 1)
+        updatedIsKit.splice(idx, 1)
+      })
+
+      setProductDetails(updatedProductDetails)
+      setIsKit(updatedIsKit)
+
+      // Show confirmation message
+      const componentCount = indicesToDelete.length - 1 // Subtract 1 for the main kit
+      if (componentCount > 0) {
+        toast.success(
+          `Main kit and ${componentCount} component(s) deleted successfully`
+        )
+      } else {
+        toast.success("Main kit deleted successfully")
+      }
+    } else {
+      // Regular product deletion (non-kit or kit component)
+      setProductDetails(
+        productDetails.filter((productDetail, idx) => idx !== index)
+      )
+      setIsKit((prevArray) => {
+        const newArray = [...prevArray]
+        newArray.splice(index, 1)
+        return newArray
+      })
+    }
   }
 
   const handleProductClear = (index) => {
@@ -432,6 +588,18 @@ export default function Customer() {
     }
   }, [formData.consigneeId])
 
+  // UX Improvement: Loading state
+  if (isLoading) {
+    return (
+      <div className="customer-container">
+        <div className="loading-container">
+          <Spin size="large" />
+          <p>Loading purchase order form...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="customer-container">
       <div className="complete-form-container">
@@ -439,156 +607,198 @@ export default function Customer() {
           <h1>Customer Purchase Order</h1>
           <Link to="/edit_customerPurchaseOrder">Edit</Link>
         </div>
+
         <div className="form-container">
           <form onSubmit={handleSubmit} autoComplete="off">
-            <div className="form-input-and-button-container">
-              <div className="only-input-styles">
-                <div className="autocomplete-wrapper">
-                  <AutoCompleteUtil
-                    data={customerData}
-                    mainData={formData}
-                    setData={setCustomerData}
-                    setMainData={setFormData}
-                    // handleChange={handleChange}
-                    filteredData={filteredCustomerData}
-                    setFilteredData={setFilteredCustomerData}
-                    name="customerId"
-                    placeholder="Customer ID"
-                    search_value="cust_id"
-                    required={true}
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    name="poNo"
-                    value={formData.poNo}
-                    onChange={handleChange}
-                    placeholder="Customer PO No."
-                    required={true}
-                  />
-                  <label
-                    alt="Customer PO No."
-                    placeholder="Customer PO No."
-                  ></label>
-                </div>
-                <div>
-                  <div className="datePickerContainer">
-                    <Space direction="vertical">
-                      <DatePicker
-                        onChange={onDateChange}
-                        value={
-                          formData.poDate
-                            ? dayjs(formData.poDate, "DD-MM-YYYY")
-                            : ""
-                        }
-                        format="DD-MM-YYYY"
-                        placeholder={"PO Date"}
-                        required={true}
-                      />
-                      {formData.poDate && (
-                        <label className="poLabel">PO Date</label>
-                      )}
-                    </Space>
+            {/* UX Improvement: Customer details section */}
+            <div className="form-section customer-details-section">
+              <h2 className="section-title">Customer Information</h2>
+              <div className="form-input-and-button-container">
+                <div className="only-input-styles">
+                  <div className="autocomplete-wrapper">
+                    <AutoCompleteUtil
+                      data={customerData}
+                      mainData={formData}
+                      setData={setCustomerData}
+                      setMainData={setFormData}
+                      filteredData={filteredCustomerData}
+                      setFilteredData={setFilteredCustomerData}
+                      name="customerId"
+                      placeholder="Customer ID"
+                      search_value="cust_id"
+                      required={true}
+                      className={formErrors.customerId ? "error-input" : ""}
+                    />
+                    {formErrors.customerId && (
+                      <div className="error-message">
+                        {formErrors.customerId}
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div>
                   <div>
-                    <Space direction="vertical">
-                      <div className="datePickerContainer">
+                    <input
+                      type="text"
+                      name="poNo"
+                      value={formData.poNo}
+                      onChange={handleChange}
+                      placeholder="Customer PO No."
+                      required={true}
+                      className={formErrors.poNo ? "error-input" : ""}
+                    />
+                    <label
+                      alt="Customer PO No."
+                      placeholder="Customer PO No."
+                    ></label>
+                    {formErrors.poNo && (
+                      <div className="error-message">{formErrors.poNo}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="datePickerContainer">
+                      <Space direction="vertical">
                         <DatePicker
-                          onChange={onValidityChange}
+                          onChange={onDateChange}
                           value={
-                            formData.poValidity
-                              ? dayjs(formData.poValidity, "DD-MM-YYYY")
+                            formData.poDate
+                              ? dayjs(formData.poDate, "DD-MM-YYYY")
                               : ""
                           }
                           format="DD-MM-YYYY"
-                          placeholder={"PO Validity"}
+                          placeholder={"PO Date"}
+                          required={true}
+                          className={formErrors.poDate ? "error-input" : ""}
                         />
-                        {formData.poValidity && (
-                          <label className="poLabel">PO Validity</label>
+                        {formData.poDate && (
+                          <label className="poLabel">PO Date</label>
                         )}
-                      </div>
-                    </Space>
+                        {formErrors.poDate && (
+                          <div className="error-message">
+                            {formErrors.poDate}
+                          </div>
+                        )}
+                      </Space>
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <Space direction="vertical">
+                        <div className="datePickerContainer">
+                          <DatePicker
+                            onChange={onValidityChange}
+                            value={
+                              formData.poValidity
+                                ? dayjs(formData.poValidity, "DD-MM-YYYY")
+                                : ""
+                            }
+                            format="DD-MM-YYYY"
+                            placeholder={"PO Validity"}
+                          />
+                          {formData.poValidity && (
+                            <label className="poLabel">PO Validity</label>
+                          )}
+                        </div>
+                      </Space>
+                    </div>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="quoteId"
+                      value={formData.quoteId}
+                      onChange={handleChange}
+                      placeholder="Quote ID"
+                    />
+                    <label
+                      alt="Enter the Quote ID"
+                      placeholder="Quote ID"
+                    ></label>
+                  </div>
+                  <div className="autocomplete-wrapper">
+                    <AutoCompleteUtil
+                      data={consigneeData}
+                      mainData={formData}
+                      setData={setConsigneeData}
+                      setMainData={setFormData}
+                      filteredData={filteredConsigneeData}
+                      setFilteredData={setFilteredConsigneeData}
+                      name="consigneeId"
+                      placeholder="Consignee ID"
+                      search_value="cust_id"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="customerName"
+                      value={formData.customerName}
+                      onChange={handleChange}
+                      placeholder="Customer Name"
+                      readOnly
+                    />
+                    <label
+                      alt="Enter the Customer Name"
+                      placeholder="Customer Name"
+                    ></label>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="consigneeName"
+                      value={formData.consigneeName}
+                      onChange={handleChange}
+                      placeholder="Consignee Name"
+                      readOnly
+                    />
+                    <label
+                      alt="Enter the Consignee Name"
+                      placeholder="Consignee Name"
+                    ></label>
+                  </div>
+                  <div>
+                    <select
+                      name="location"
+                      value={formData.location}
+                      onChange={handleChange}
+                      required
+                      className={formErrors.location ? "error-input" : ""}
+                    >
+                      <option value="HBL">Hebbal (HBL)</option>
+                      <option value="ASP">Aerospace Park (ASP)</option>
+                    </select>
+                    <label alt="Select Location" placeholder="Location"></label>
+                    {formErrors.location && (
+                      <div className="error-message">{formErrors.location}</div>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <input
-                    type="text"
-                    // required={true}
-                    name="quoteId"
-                    value={formData.quoteId}
-                    onChange={handleChange}
-                    placeholder=" "
-                  />
-                  <label
-                    alt="Enter the Quote ID"
-                    placeholder="Quote ID"
-                  ></label>
-                </div>
-                <div className="autocomplete-wrapper">
-                  <AutoCompleteUtil
-                    data={consigneeData}
-                    mainData={formData}
-                    setData={setConsigneeData}
-                    setMainData={setFormData}
-                    // handleChange={handleChange}
-                    filteredData={filteredConsigneeData}
-                    setFilteredData={setFilteredConsigneeData}
-                    name="consigneeId"
-                    placeholder="Consignee ID"
-                    search_value="cust_id"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    name="customerName"
-                    value={formData.customerName}
-                    onChange={handleChange}
-                    placeholder=" "
-                    readOnly
-                  />
-                  <label
-                    alt="Enter the Customer Name"
-                    placeholder="Customer Name"
-                  ></label>
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    name="consigneeName"
-                    value={formData.consigneeName}
-                    onChange={handleChange}
-                    placeholder=" "
-                    readOnly
-                  />
-                  <label
-                    alt="Enter the Consignee Name"
-                    placeholder="Consignee Name"
-                  ></label>
-                </div>
-                <div>
-                  <select
-                    name="location"
-                    value={formData.location}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="HBL">Hebbal (HBL)</option>
-                    <option value="ASP">Aerospace Park (ASP)</option>
-                  </select>
-                  <label alt="Select Location" placeholder="Location"></label>
-                </div>
               </div>
-              {/* {console.log("product details: ", productDetails)} */}
+            </div>
+
+            {/* UX Improvement: Product details section */}
+            <div className="form-section product-details-section">
+              <h2 className="section-title">Product Information</h2>
               {productDetails &&
                 productDetails.map((productDetail, index) => {
+                  // Determine if this is a main kit product or kit component
+                  const isMainKit =
+                    productDetail.prodId &&
+                    productDetail.prodId.toLowerCase().includes("kit") &&
+                    productDetail.poSlNo &&
+                    !productDetail.poSlNo.includes(".")
+                  const isKitComponent =
+                    productDetail.poSlNo && productDetail.poSlNo.includes(".")
+
+                  // Determine CSS class based on kit relationship
+                  let productItemClass = "product-item"
+                  if (isMainKit) {
+                    productItemClass += " kit-main"
+                  } else if (isKitComponent) {
+                    productItemClass += " kit-component"
+                  }
+
                   return (
-                    <>
+                    <div key={index} className={productItemClass}>
                       <ProductDetails
-                        key={index}
                         index={index}
                         isKit={isKit}
                         setIsKit={setIsKit}
@@ -605,20 +815,73 @@ export default function Customer() {
                         handleProductClear={handleProductClear}
                         kit={kit}
                         setKit={setKit}
+                        errors={
+                          formErrors.products && formErrors.products[index]
+                        }
                       />
-                    </>
+                    </div>
                   )
                 })}
             </div>
-            <div>Grand Total: {grandTotal()}</div>
+
             <div className="form-button-container">
-              <button type="button" value="nextEntry" onClick={addMore}>
-                Add More
+              <button
+                type="button"
+                value="nextEntry"
+                onClick={addMore}
+                className="add-more-btn"
+              >
+                Add More Products
               </button>
-              <button type="submit">Submit</button>
-              <button type="button" value="reset" onClick={resetForm}>
-                Reset
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="submit-btn"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Spin size="small" style={{ marginRight: "8px" }} />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Order"
+                )}
               </button>
+              <button
+                type="button"
+                value="reset"
+                onClick={resetForm}
+                className="reset-btn"
+              >
+                Reset Form
+              </button>
+            </div>
+
+            {/* UX Improvement: Summary section */}
+            <div className="form-section summary-section">
+              <div className="summary-card">
+                <h3>Order Summary</h3>
+                <div className="summary-content">
+                  <div className="summary-item">
+                    <span>Customer:</span>
+                    <span>{formData.customerName || "Not selected"}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>PO Number:</span>
+                    <span>{formData.poNo || "Not entered"}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Products:</span>
+                    <span>
+                      {productDetails.filter((p) => p.prodId).length} items
+                    </span>
+                  </div>
+                  <div className="summary-item total">
+                    <span>Grand Total:</span>
+                    <span>₹{grandTotal()}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </form>
         </div>

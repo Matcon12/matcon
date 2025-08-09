@@ -28,16 +28,22 @@ export default function OutstandingPO() {
   ]
 
   const onStartDateChange = (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+
     setFormData((prevFormData) => ({
       ...prevFormData,
-      from_date: dateString,
+      from_date: value,
     }))
   }
 
   const onEndDateChange = (date, dateString) => {
+    // Handle empty string or null values when user clears the date
+    const value = dateString && dateString.trim() !== "" ? dateString : null
+
     setFormData((prevFormData) => ({
       ...prevFormData,
-      to_date: dateString,
+      to_date: value,
     }))
   }
 

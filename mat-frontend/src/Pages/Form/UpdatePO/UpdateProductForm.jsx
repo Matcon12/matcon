@@ -20,11 +20,27 @@ export default function UpdateProductForm({
     })
   }, [])
 
+  // Utility function to format numbers to 2 decimal places
+  const formatToTwoDecimals = (value) => {
+    const num = parseFloat(value)
+    return isNaN(num) ? "0.00" : num.toFixed(2)
+  }
+
   const handleChange = (e) => {
     const { name, value } = e.target
+
+    // Format numeric fields to 2 decimal places
+    let processedValue = value
+    if (["quantity", "qty_sent", "qty_balance"].includes(name)) {
+      const numValue = parseFloat(value)
+      if (!isNaN(numValue)) {
+        processedValue = numValue // Don't format to 2 decimals on change, only on blur
+      }
+    }
+
     setKitData((prevData) => {
       const updatedData = prevData.map((item, i) =>
-        i === index ? { ...item, [name]: value } : item
+        i === index ? { ...item, [name]: processedValue } : item
       )
       return updatedData
     })
@@ -69,9 +85,10 @@ export default function UpdateProductForm({
     setKitData((prevData) => {
       return prevData?.map((item) => {
         if (data.po_sl_no === item.po_sl_no) {
+          const balance = qnty - (parseFloat(item.qty_sent) || 0)
           return {
             ...item,
-            qty_balance: qnty - (parseFloat(item.qty_sent) || 0),
+            qty_balance: balance.toFixed(2),
           }
         }
         return item
@@ -109,9 +126,10 @@ export default function UpdateProductForm({
     setKitData((prevData) => {
       return prevData?.map((item) => {
         if (data.po_sl_no === item.po_sl_no) {
+          const balance = parseFloat(data.quantity) - parseFloat(data.qty_sent)
           return {
             ...item,
-            qty_balance: data.quantity - data.qty_sent,
+            qty_balance: isNaN(balance) ? "0.00" : balance.toFixed(2),
           }
         }
         return item
@@ -215,11 +233,22 @@ export default function UpdateProductForm({
         <div>
           <input
             type="number"
+            step="0.01"
             /*required={true}*/
             name="quantity"
             value={data.quantity}
             onChange={handleChange}
-            onBlur={handleQtyChange}
+            onBlur={(e) => {
+              // Format to 2 decimal places on blur
+              const numValue = parseFloat(e.target.value)
+              if (!isNaN(numValue)) {
+                handleChange({
+                  target: { name: "quantity", value: numValue.toFixed(2) },
+                })
+              }
+              handleQtyChange(e)
+            }}
+            onWheel={(e) => e.target.blur()}
             placeholder=" "
           />
           <label alt="Enter the Quantity" placeholder="Quantity"></label>
@@ -227,10 +256,21 @@ export default function UpdateProductForm({
         <div>
           <input
             type="number"
+            step="0.01"
             /*required={true}*/
             name="qty_sent"
             value={data.qty_sent}
             onChange={handleChange}
+            onBlur={(e) => {
+              // Format to 2 decimal places on blur
+              const numValue = parseFloat(e.target.value)
+              if (!isNaN(numValue)) {
+                handleChange({
+                  target: { name: "qty_sent", value: numValue.toFixed(2) },
+                })
+              }
+            }}
+            onWheel={(e) => e.target.blur()}
             placeholder=" "
           />
           <label alt="Enter the Quantity" placeholder="Quantity Sent"></label>

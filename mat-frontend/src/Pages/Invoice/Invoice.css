@@ -2,6 +2,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .invoice-generation-container {
@@ -29,6 +34,12 @@
   width: 300px !important;
 }
 
+.invoice-input-complete-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .invoice-input-complete-container > div > p {
   margin: 20px 0;
 }
@@ -37,6 +48,31 @@
   display: grid;
   justify-items: center;
   margin: 20px 0;
+}
+
+/* Submit button styling for invoice page */
+.submit-button button {
+  padding: 0.8em 2.5em;
+  font-size: 1.1em;
+  font-weight: 600;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 1.25em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+}
+
+.submit-button button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.submit-button button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .otherChargesContainer {
@@ -67,12 +103,29 @@
   margin: 0 1em;
 }
 
+/* Invoice container wrapper for proper centering */
 .invoice-container-container {
-  width: 100%;
-  /* height: 100vh; */
-  display: grid;
+  display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.invoice-container {
+  width: 780px;
+  max-width: 100%;
+  margin: 0 auto; /* Center the container */
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  justify-items: center;
+  border: 1px solid black;
+  gap: 20px;
+  font-size: 13px;
+  font-family: "Times New Roman", Times, serif;
+  padding: 10px 30px;
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* .noOfBatches {
@@ -106,6 +159,8 @@
   border: 2px solid #e3f2fd;
   border-radius: 8px;
   background-color: #f8f9fa;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .kit-components-header {
@@ -205,6 +260,8 @@
   grid-template-columns: 1fr auto;
   gap: 15px;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .kit-component-info {
@@ -372,6 +429,10 @@
   border-radius: 8px;
   background-color: #f8f9fa;
   overflow: hidden;
+  width: 100%;
+  max-width: 1200px;
+  min-width: 800px;
+  box-sizing: border-box;
 }
 
 .entry-header {
@@ -425,6 +486,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .product-info {
@@ -495,11 +558,38 @@
     overflow: initial !important;
     -webkit-print-color-adjust: exact;
   }
+
+  /* Ensure invoice container is centered during print */
+  .invoice-container-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 0; /* Remove top padding since we have page margin */
+    padding-bottom: 0; /* Remove bottom padding since we have page margin */
+  }
+
+  .invoice-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+  }
+
+  /* Center all content within the invoice */
+  .invoice-container > * {
+    text-align: center;
+  }
+
+  /* Ensure tables are properly centered */
+  table {
+    margin: 0 auto;
+  }
 }
 
 @media print {
   .page-break {
-    margin-top: 5rem;
+    margin-top: 2rem; /* Reduced margin since we have page margins */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -511,5 +601,5 @@
 
 @page {
   size: auto;
-  margin: 40mm 0;
+  margin: 4cm 2cm 3cm 2cm; /* Top, Right, Bottom, Left margins for printer headers/footers */
 }

@@ -23,3 +23,28 @@
   justify-content: center;
   align-items: center;
 }
+
+/* Button styling for InvoiceReport page */
+.invoiceReportInputSubmit button {
+  padding: 0.8em 2.5em;
+  font-size: 1.1em;
+  font-weight: 600;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 1.25em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+}
+
+.invoiceReportInputSubmit button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.invoiceReportInputSubmit button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
