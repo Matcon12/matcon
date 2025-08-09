@@ -87,6 +87,54 @@ export default function Customer() {
   const [formData, setFormData] = useState(initialFormData)
   const [productDetails, setProductDetails] = useState([initialProductDetails])
 
+  // Utility function to validate kit product quantities
+  const validateKitQuantities = () => {
+    const kitValidationErrors = []
+
+    // Find all main kit products
+    const mainKitProducts = productDetails.filter(
+      (product) =>
+        product.prodId &&
+        product.prodId.toLowerCase().includes("kit") &&
+        product.poSlNo &&
+        !product.poSlNo.includes(".")
+    )
+
+    mainKitProducts.forEach((mainKit, mainKitIndex) => {
+      const mainKitPoSlNo = mainKit.poSlNo
+      const mainKitQuantity = parseFloat(mainKit.quantity) || 0
+
+      // Find all kit components for this main kit
+      const kitComponents = productDetails.filter(
+        (product) =>
+          product.poSlNo &&
+          product.poSlNo.startsWith(mainKitPoSlNo + ".") &&
+          product.poSlNo !== mainKitPoSlNo
+      )
+
+      if (kitComponents.length > 0) {
+        // Calculate sum of kit component quantities
+        const componentQuantitySum = kitComponents.reduce((sum, component) => {
+          return sum + (parseFloat(component.quantity) || 0)
+        }, 0)
+
+        // Check if main kit quantity equals sum of component quantities
+        if (Math.abs(mainKitQuantity - componentQuantitySum) > 0.001) {
+          // Using small epsilon for float comparison
+          const mainKitProductIndex = productDetails.indexOf(mainKit)
+          kitValidationErrors.push({
+            index: mainKitProductIndex,
+            message: `Kit product quantity (${mainKitQuantity}) must equal sum of component quantities (${componentQuantitySum.toFixed(
+              2
+            )})`,
+          })
+        }
+      }
+    })
+
+    return kitValidationErrors
+  }
+
   // UX Improvement: Enhanced validation
   const validateForm = () => {
     const errors = {}
@@ -141,6 +189,15 @@ export default function Customer() {
       if (Object.keys(productError).length > 0) {
         productErrors[index] = productError
       }
+    })
+
+    // Validate kit quantities
+    const kitQuantityErrors = validateKitQuantities()
+    kitQuantityErrors.forEach(({ index, message }) => {
+      if (!productErrors[index]) {
+        productErrors[index] = {}
+      }
+      productErrors[index].kitQuantity = message
     })
 
     if (productErrors.length > 0) {
@@ -242,6 +299,61 @@ export default function Customer() {
           },
         },
       }))
+    }
+
+    // Real-time kit quantity validation when quantity changes
+    if (name === "quantity") {
+      setTimeout(() => {
+        const kitQuantityErrors = validateKitQuantities()
+        if (kitQuantityErrors.length > 0) {
+          setFormErrors((prev) => {
+            const newErrors = { ...prev }
+            if (!newErrors.products) newErrors.products = []
+
+            // Clear existing kit quantity errors
+            Object.keys(newErrors.products).forEach((index) => {
+              if (
+                newErrors.products[index] &&
+                newErrors.products[index].kitQuantity
+              ) {
+                delete newErrors.products[index].kitQuantity
+                if (Object.keys(newErrors.products[index]).length === 0) {
+                  delete newErrors.products[index]
+                }
+              }
+            })
+
+            // Add new kit quantity errors
+            kitQuantityErrors.forEach(({ index, message }) => {
+              if (!newErrors.products[index]) {
+                newErrors.products[index] = {}
+              }
+              newErrors.products[index].kitQuantity = message
+            })
+
+            return newErrors
+          })
+        } else {
+          // Clear kit quantity errors if validation passes
+          setFormErrors((prev) => {
+            const newErrors = { ...prev }
+            if (newErrors.products) {
+              Object.keys(newErrors.products).forEach((index) => {
+                if (
+                  newErrors.products[index] &&
+                  newErrors.products[index].kitQuantity
+                ) {
+                  delete newErrors.products[index].kitQuantity
+                  if (Object.keys(newErrors.products[index]).length === 0) {
+                    delete newErrors.products[index]
+                  }
+                }
+              })
+            }
+            return newErrors
+          })
+        }
+      }, 300) // Small delay to ensure state is updated
     }
   }
   // ------------------------------- End of Changes ------------------------
@@ -819,6 +931,16 @@ export default function Customer() {
                           formErrors.products && formErrors.products[index]
                         }
                       />
+                      {/* Display kit quantity validation error */}
+                      {formErrors.products &&
+                        formErrors.products[index] &&
+                        formErrors.products[index].kitQuantity && (
+                          <div className="kit-quantity-error">
+                            <div className="error-message kit-validation-error">
+                              {formErrors.products[index].kitQuantity}
+                            </div>
+                          </div>
+                        )}
                     </div>
                   )
                 })}

@@ -217,6 +217,7 @@ export default function UpdatePO() {
           .get("/getData", {
             params: {
               pono: searchData.pono,
+              ...(searchData.po_sl_no && { po_sl_no: searchData.po_sl_no }),
             },
           })
           .then((response) => {
@@ -268,9 +269,29 @@ export default function UpdatePO() {
               hsn_sac: data.hsn_sac,
               location: data.location,
             })
-            toast.success("Successfuly fetched Data!!")
+
+            // Set kit data and check if it's a kit product
+            if (
+              response.data.filtered_data &&
+              response.data.filtered_data.length > 0
+            ) {
+              setKitData(response.data.filtered_data)
+              setIsKit(true)
+            } else {
+              setKitData(null)
+              setIsKit(false)
+            }
+
+            // Mark initial load as complete
+            setIsInitialLoad(false)
+
+            const successMessage = searchData.po_sl_no
+              ? `Successfully fetched data for PO Sl No: ${data.po_sl_no}`
+              : "Successfully fetched data!!"
+            toast.success(successMessage)
           })
           .catch((error) => {
+            setIsInitialLoad(false) // Mark initial load as complete even on error
             toast.error("ERROR in Fetching Data")
           })
   }

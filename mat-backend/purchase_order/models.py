@@ -56,7 +56,7 @@ class CustomerPurchaseOrder(models.Model):
     location = models.CharField(max_length=3, default='HBL')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Customer_Purchase_Order'
 
 
@@ -236,7 +236,7 @@ class OtwDc(models.Model):
     location = models.CharField(max_length=3, default='HBL')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'otw_dc'
 
 

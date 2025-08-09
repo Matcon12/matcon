@@ -1,5 +1,136 @@
 from django.test import TestCase
 import re
+from .views import validate_kit_quantities
+
+
+class KitQuantityValidationTestCase(TestCase):
+    """Test case for kit quantity validation functionality"""
+    
+    def test_valid_kit_quantities(self):
+        """Test that validation passes when kit quantity equals sum of components"""
+        product_details = [
+            {
+                'prodId': 'KIT001',
+                'poSlNo': '1',
+                'quantity': '10'
+            },
+            {
+                'prodId': 'COMP001',
+                'poSlNo': '1.1',
+                'quantity': '5'
+            },
+            {
+                'prodId': 'COMP002',
+                'poSlNo': '1.2',
+                'quantity': '5'
+            }
+        ]
+        
+        errors = validate_kit_quantities(product_details)
+        self.assertEqual(len(errors), 0, "Should have no validation errors when quantities match")
+    
+    def test_invalid_kit_quantities(self):
+        """Test that validation fails when kit quantity doesn't equal sum of components"""
+        product_details = [
+            {
+                'prodId': 'KIT001',
+                'poSlNo': '2',
+                'quantity': '10'
+            },
+            {
+                'prodId': 'COMP001',
+                'poSlNo': '2.1',
+                'quantity': '3'
+            },
+            {
+                'prodId': 'COMP002',
+                'poSlNo': '2.2',
+                'quantity': '4'
+            }
+        ]
+        
+        errors = validate_kit_quantities(product_details)
+        self.assertEqual(len(errors), 1, "Should have one validation error")
+        self.assertIn("KIT001", errors[0], "Error should mention the kit product")
+        self.assertIn("10", errors[0], "Error should mention kit quantity")
+        self.assertIn("7.00", errors[0], "Error should mention component sum")
+    
+    def test_multiple_kits_validation(self):
+        """Test validation with multiple kit products"""
+        product_details = [
+            # First kit - valid
+            {
+                'prodId': 'KIT001',
+                'poSlNo': '1',
+                'quantity': '5'
+            },
+            {
+                'prodId': 'COMP001',
+                'poSlNo': '1.1',
+                'quantity': '2'
+            },
+            {
+                'prodId': 'COMP002',
+                'poSlNo': '1.2',
+                'quantity': '3'
+            },
+            # Second kit - invalid
+            {
+                'prodId': 'KIT002',
+                'poSlNo': '2',
+                'quantity': '8'
+            },
+            {
+                'prodId': 'COMP003',
+                'poSlNo': '2.1',
+                'quantity': '5'
+            }
+        ]
+        
+        errors = validate_kit_quantities(product_details)
+        self.assertEqual(len(errors), 1, "Should have one validation error for the invalid kit")
+        self.assertIn("KIT002", errors[0], "Error should mention the invalid kit")
+    
+    def test_kit_without_components(self):
+        """Test that kit without components doesn't cause validation errors"""
+        product_details = [
+            {
+                'prodId': 'KIT001',
+                'poSlNo': '1',
+                'quantity': '10'
+            },
+            {
+                'prodId': 'REGULAR001',
+                'poSlNo': '2',
+                'quantity': '5'
+            }
+        ]
+        
+        errors = validate_kit_quantities(product_details)
+        self.assertEqual(len(errors), 0, "Should have no errors when kit has no components")
+    
+    def test_decimal_quantities(self):
+        """Test validation with decimal quantities"""
+        product_details = [
+            {
+                'prodId': 'KIT001',
+                'poSlNo': '1',
+                'quantity': '10.5'
+            },
+            {
+                'prodId': 'COMP001',
+                'poSlNo': '1.1',
+                'quantity': '5.25'
+            },
+            {
+                'prodId': 'COMP002',
+                'poSlNo': '1.2',
+                'quantity': '5.25'
+            }
+        ]
+        
+        errors = validate_kit_quantities(product_details)
+        self.assertEqual(len(errors), 0, "Should handle decimal quantities correctly")
 
 # Create your tests here.
 

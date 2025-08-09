@@ -24,6 +24,12 @@ export default function InvoiceReportInput() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    // Validate that both dates are provided
+    if (!formData.startDate || !formData.endDate) {
+      alert("Please select both start date and end date")
+      return
+    }
+
     try {
       const responseData = await generateInvoiceReport(
         formData.startDate,
@@ -34,7 +40,7 @@ export default function InvoiceReportInput() {
       }
     } catch (error) {
       console.error("Failed to generate invoice report:", error)
-      // Could add error handling UI here
+      alert(`Failed to generate invoice report: ${error.message}`)
     }
   }
 

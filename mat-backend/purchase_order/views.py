@@ -121,6 +121,46 @@ def round_decimal(value, decimal_places=2):
 
 from django.core.exceptions import ValidationError
 
+def validate_kit_quantities(product_details):
+    """
+    Validate that main kit product quantities equal the sum of their component quantities.
+    Returns a list of validation error messages.
+    """
+    validation_errors = []
+    
+    # Find all main kit products
+    main_kit_products = [
+        product for product in product_details
+        if (product.get('prodId', '').upper().startswith('KIT') and 
+            product.get('poSlNo', '') and 
+            '.' not in product.get('poSlNo', ''))
+    ]
+    
+    for main_kit in main_kit_products:
+        main_kit_po_sl_no = main_kit.get('poSlNo', '')
+        main_kit_quantity = float(main_kit.get('quantity', 0))
+        main_kit_prod_id = main_kit.get('prodId', '')
+        
+        # Find all kit components for this main kit
+        kit_components = [
+            product for product in product_details
+            if (product.get('poSlNo', '').startswith(main_kit_po_sl_no + '.') and
+                product.get('poSlNo', '') != main_kit_po_sl_no)
+        ]
+        
+        if kit_components:
+            # Calculate sum of kit component quantities
+            component_quantity_sum = sum(float(component.get('quantity', 0)) for component in kit_components)
+            
+            # Check if main kit quantity equals sum of component quantities (with small epsilon for float comparison)
+            if abs(main_kit_quantity - component_quantity_sum) > 0.001:
+                validation_errors.append(
+                    f"Kit product '{main_kit_prod_id}' (PO SL No: {main_kit_po_sl_no}) quantity ({main_kit_quantity}) "
+                    f"must equal sum of component quantities ({component_quantity_sum:.2f})"
+                )
+    
+    return validation_errors
+
 @csrf_exempt
 def submit_form(request):
     if request.method == 'POST':
@@ -148,6 +188,11 @@ def submit_form(request):
             
             formData['poDate'] = convert_date_format(formData.get('poDate')) if formData.get('poDate') else None
             formData['poValidity'] = convert_date_format(formData.get('poValidity')) if formData.get('poValidity') else None
+
+            # Validate kit quantities before processing
+            kit_validation_errors = validate_kit_quantities(productDetails)
+            if kit_validation_errors:
+                return JsonResponse({'error': f'Kit quantity validation failed: {"; ".join(kit_validation_errors)}'}, status=400)
 
             with transaction.atomic():
                 for product in productDetails:
@@ -245,15 +290,29 @@ def get_data_purchase_order(request):
     if request.method == 'GET':
         try:
             po_no = request.GET.get('pono')
-            data = CustomerPurchaseOrder.objects.filter(pono=po_no).order_by('po_sl_no').first()
+            requested_po_sl_no = request.GET.get('po_sl_no')  # Optional parameter
+            
+            # If po_sl_no is specified, get that specific record; otherwise get the first one
+            if requested_po_sl_no:
+                data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no=requested_po_sl_no).first()
+            else:
+                data = CustomerPurchaseOrder.objects.filter(pono=po_no).order_by('po_sl_no').first()
 
             if data:
                 data_dict = model_to_dict(data)
+                # Get all main product po_sl_nos (without dots)
                 po_sl_nos = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__regex=r'^[^.]+$').values('po_sl_no').order_by('po_sl_no')
+                
+                # Get all po_sl_nos for this PO
                 po_nos = CustomerPurchaseOrder.objects.filter(pono=po_no).values_list('po_sl_no', flat=True).order_by('po_sl_no')
-                filtered_po_sl_nos = [no for no in po_nos if no.startswith(data_dict['po_sl_no'] + ".")]
+                
+                # Find kit components for the current main product
+                main_po_sl_no = data_dict['po_sl_no']
+                filtered_po_sl_nos = [no for no in po_nos if no.startswith(main_po_sl_no + ".")]
                 filtered_data = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=filtered_po_sl_nos)
                 filtered_data_dicts = [model_to_dict(item) for item in filtered_data]
+                
+                # Calculate total sum for the entire PO
                 total_sum = CustomerPurchaseOrder.objects.filter(pono=po_no).aggregate(total_sum=Sum('total_price'))['total_sum']
                 
 
@@ -1468,183 +1527,209 @@ def invoice_processing(request):
 @csrf_exempt
 def invoice_generation(request):
     if request.method == "GET":
-        gcn_no = request.GET.get("gcn_no")  # renamed for clarity
-        year = request.GET.get("year")      # expected format: 2024-25
+        try:
+            gcn_no = request.GET.get("gcn_no")  # renamed for clarity
+            year = request.GET.get("year")      # expected format: 2024-25
 
-        if not gcn_no or not year:
-            return JsonResponse({"error": "Both gcn_no and year are required"}, status=400)
+            if not gcn_no or not year:
+                return JsonResponse({"error": "Both gcn_no and year are required"}, status=400)
 
-        # Format the gcn_no like 001/2024-25
-        gcn_num = f"{str(gcn_no).zfill(3)}/{year}"
-        print("Formatted gcn_num:", gcn_num)
+            # Format the gcn_no like 001/2024-25
+            gcn_num = f"{str(gcn_no).zfill(3)}/{year}"
+            print("Formatted gcn_num:", gcn_num)
 
-        otwdc_values = OtwDc.objects.filter(gcn_no=gcn_num)
-        if not otwdc_values.exists():
-            return JsonResponse({"error": "No records found for the provided GCN number"}, status=404)
+            # Helper function to safely convert values to float
+            def safe_float_conversion(value):
+                """Safely convert value to float, handling None, empty strings, and other types"""
+                if value is None or value == '':
+                    return 0.0
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return 0.0
 
-        def model_to_dic(instance):
-            # Calculate number of packs by dividing qty_delivered by pack_size (extract numeric part)
-            number_of_packs = 0
-            try:
-                qty_delivered = float(instance.qty_delivered) if instance.qty_delivered else 0
+            otwdc_values = OtwDc.objects.filter(gcn_no=gcn_num)
+            if not otwdc_values.exists():
+                return JsonResponse({"error": "No records found for the provided GCN number"}, status=404)
+
+            def model_to_dic(instance):
                 
-                # Check if this is a kit component (po_sl_no contains a dot)
-                is_kit_component = instance.po_sl_no and '.' in instance.po_sl_no
-                
-                import re
-                pack_size_str = str(instance.pack_size) if instance.pack_size else "1"
-                match = re.search(r"(\d+(?:\.\d+)?)", pack_size_str)
-                pack_size = float(match.group(1)) if match else 1.0
-                
-                if is_kit_component:
-                    # For kit components: qty_delivered represents the actual quantity delivered
-                    # Calculate number_of_packs = qty_delivered / pack_size
-                    if pack_size > 0:
-                        number_of_packs = qty_delivered / pack_size
-                        # Round to 2 decimal places for kit components
-                        number_of_packs = round(number_of_packs, 2)
-                    else:
-                        number_of_packs = qty_delivered
-                    
-                    print(f"Kit component {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
-                else:
-                    # For regular products: calculate number_of_packs = qty_delivered / pack_size
-                    if pack_size > 0:
-                        number_of_packs = qty_delivered / pack_size
-                    else:
-                        number_of_packs = qty_delivered
-                    
-                    print(f"Regular product {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
-            except (ValueError, TypeError):
+                # Calculate number of packs by dividing qty_delivered by pack_size (extract numeric part)
                 number_of_packs = 0
+                try:
+                    qty_delivered = float(instance.qty_delivered) if instance.qty_delivered else 0
+                    
+                    # Check if this is a kit component (po_sl_no contains a dot)
+                    is_kit_component = instance.po_sl_no and '.' in instance.po_sl_no
+                    
+                    import re
+                    pack_size_str = str(instance.pack_size) if instance.pack_size else "1"
+                    match = re.search(r"(\d+(?:\.\d+)?)", pack_size_str)
+                    pack_size = float(match.group(1)) if match else 1.0
+                    
+                    if is_kit_component:
+                        # For kit components: qty_delivered represents the actual quantity delivered
+                        # Calculate number_of_packs = qty_delivered / pack_size
+                        if pack_size > 0:
+                            number_of_packs = qty_delivered / pack_size
+                            # Round to 2 decimal places for kit components
+                            number_of_packs = round(number_of_packs, 2)
+                        else:
+                            number_of_packs = qty_delivered
+                        
+                        print(f"Kit component {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
+                    else:
+                        # For regular products: calculate number_of_packs = qty_delivered / pack_size
+                        if pack_size > 0:
+                            number_of_packs = qty_delivered / pack_size
+                        else:
+                            number_of_packs = qty_delivered
+                        
+                        print(f"Regular product {instance.po_sl_no}: qty_delivered={qty_delivered}, pack_size={pack_size}, number_of_packs={number_of_packs}")
+                except (ValueError, TypeError):
+                    number_of_packs = 0
 
-            result = {
-                'sl_no': instance.sl_no,
-                'gcn_no': instance.gcn_no,
-                'gcn_date': str(instance.gcn_date),
-                'po_no': instance.po_no,
-                'po_date': str(instance.po_date),
-                'cust_id': instance.cust.cust_id if instance.cust else '',
-                'consignee_id': instance.consignee_id,
-                'prod_id': instance.prod_id,
-                'po_sl_no': instance.po_sl_no,
-                'prod_desc': instance.prod_desc,
-                'additional_desc': instance.additional_desc,
-                'hsn': instance.hsn_sac,
-                'batch': instance.batch,
-                'coc': instance.coc,
-                'qty_delivered': str(qty_delivered) if is_kit_component else instance.qty_delivered,
-                'number_of_packs': round(number_of_packs, 2),  # Add number of packs field
-                'pack_size': instance.pack_size,
-                'unit_price': instance.unit_price,
-                'taxable_amt': instance.taxable_amt,
-                'cgst_price': instance.cgst_price,
-                'sgst_price': instance.sgst_price,
-                'igst_price': instance.igst_price,
-                'contact_name': instance.contact_name,
-                'batch_quantity': instance.batch_quantity,
-                'location': instance.location  # Add location to response
-            }
-            print(f"Debug - {instance.po_sl_no}: qty_delivered={instance.qty_delivered}, pack_size={instance.pack_size}, number_of_packs={round(number_of_packs, 2)}")
-            return result
+                result = {
+                    'sl_no': instance.sl_no,
+                    'gcn_no': instance.gcn_no,
+                    'gcn_date': str(instance.gcn_date),
+                    'po_no': instance.po_no,
+                    'po_date': str(instance.po_date),
+                    'cust_id': instance.cust.cust_id if instance.cust else '',
+                    'consignee_id': instance.consignee_id,
+                    'prod_id': instance.prod_id,
+                    'po_sl_no': instance.po_sl_no,
+                    'prod_desc': instance.prod_desc,
+                    'additional_desc': instance.additional_desc,
+                    'hsn': instance.hsn_sac,
+                    'batch': instance.batch,
+                    'coc': instance.coc,
+                    'qty_delivered': str(qty_delivered) if is_kit_component else instance.qty_delivered,
+                    'number_of_packs': round(number_of_packs, 2),  # Add number of packs field
+                    'pack_size': instance.pack_size,
+                    'unit_price': safe_float_conversion(instance.unit_price),
+                    'taxable_amt': safe_float_conversion(instance.taxable_amt),
+                    'cgst_price': safe_float_conversion(instance.cgst_price),
+                    'sgst_price': safe_float_conversion(instance.sgst_price),
+                    'igst_price': safe_float_conversion(instance.igst_price),
+                    'contact_name': instance.contact_name,
+                    'batch_quantity': instance.batch_quantity,
+                    'location': instance.location  # Add location to response
+                }
+                print(f"Debug - {instance.po_sl_no}: qty_delivered={instance.qty_delivered}, pack_size={instance.pack_size}, number_of_packs={round(number_of_packs, 2)}")
+                return result
 
-        otwdc_result = [model_to_dic(otwdc_value) for otwdc_value in otwdc_values]
+            otwdc_result = [model_to_dic(otwdc_value) for otwdc_value in otwdc_values]
 
-        # Keep unique po_sl_no entries only
-        unique_po_sl_no = {}
-        for item in otwdc_result:
-            if item['po_sl_no'] not in unique_po_sl_no:
-                unique_po_sl_no[item['po_sl_no']] = item
+            # Keep unique po_sl_no entries only
+            unique_po_sl_no = {}
+            for item in otwdc_result:
+                if item['po_sl_no'] not in unique_po_sl_no:
+                    unique_po_sl_no[item['po_sl_no']] = item
 
-        inv_result = list(unique_po_sl_no.values())
-        
-        # Ensure inv_result also has number_of_packs field
-        for inv_item in inv_result:
-            # Find corresponding item in otwdc_result to get number_of_packs
-            for otwdc_item in otwdc_result:
-                if otwdc_item['po_sl_no'] == inv_item['po_sl_no']:
-                    inv_item['number_of_packs'] = otwdc_item.get('number_of_packs', 0)
-                    print(f"Debug - Added number_of_packs to inv_result for {inv_item['po_sl_no']}: {otwdc_item.get('number_of_packs', 0)}")
-                    break
-        
-        # For main kit products, calculate number_of_packs as sum of kit components' number_of_packs
-        for inv_item in inv_result:
-            # Check if this is a main kit product (po_sl_no doesn't contain a dot)
-            po_sl_no = inv_item['po_sl_no']
-            if '.' not in po_sl_no and po_sl_no not in ['fr', 'ins', 'oc']:
-                # Find all kit components for this main kit (po_sl_no with dots)
-                kit_components_number_of_packs_sum = 0
-                kit_components_qty_sum = 0
-                for otwdc_item in otwdc_result:
-                    if otwdc_item['po_sl_no'].startswith(po_sl_no + '.') or otwdc_item['po_sl_no'] == po_sl_no + '.1' or otwdc_item['po_sl_no'] == po_sl_no + '.2':
-                        kit_components_number_of_packs_sum += otwdc_item.get('number_of_packs', 0)
-                        kit_components_qty_sum += float(otwdc_item.get('qty_delivered', 0))
-                
-                # Update main kit with sum of kit components' number_of_packs and qty_delivered
-                if kit_components_number_of_packs_sum > 0:
-                    inv_item['number_of_packs'] = kit_components_number_of_packs_sum
-                    inv_item['qty_delivered'] = kit_components_qty_sum
-                    print(f"Debug - Updated main kit {po_sl_no}: number_of_packs={kit_components_number_of_packs_sum}, qty_delivered={kit_components_qty_sum}")
-                else:
-                    # If no kit components found, keep the original calculation
-                    print(f"Debug - No kit components found for main kit {po_sl_no}, keeping original number_of_packs")
+            inv_result = list(unique_po_sl_no.values())
             
-            # Ensure kit components have unit_price = 0
-            if '.' in po_sl_no:
-                inv_item['unit_price'] = 0
-                inv_item['taxable_amt'] = 0
-                print(f"Debug - Set unit_price and taxable_amt to 0 for kit component {po_sl_no}")
+            # Ensure inv_result also has number_of_packs field
+            for inv_item in inv_result:
+                # Find corresponding item in otwdc_result to get number_of_packs
+                for otwdc_item in otwdc_result:
+                    if otwdc_item['po_sl_no'] == inv_item['po_sl_no']:
+                        inv_item['number_of_packs'] = otwdc_item.get('number_of_packs', 0)
+                        print(f"Debug - Added number_of_packs to inv_result for {inv_item['po_sl_no']}: {otwdc_item.get('number_of_packs', 0)}")
+                        break
+            
+            # For main kit products, calculate number_of_packs as sum of kit components' number_of_packs
+            for inv_item in inv_result:
+                # Check if this is a main kit product (po_sl_no doesn't contain a dot)
+                po_sl_no = inv_item['po_sl_no']
+                if '.' not in po_sl_no and po_sl_no not in ['fr', 'ins', 'oc']:
+                    # Find all kit components for this main kit (po_sl_no with dots)
+                    kit_components_number_of_packs_sum = 0
+                    kit_components_qty_sum = 0
+                    for otwdc_item in otwdc_result:
+                        if otwdc_item['po_sl_no'].startswith(po_sl_no + '.') or otwdc_item['po_sl_no'] == po_sl_no + '.1' or otwdc_item['po_sl_no'] == po_sl_no + '.2':
+                            kit_components_number_of_packs_sum += otwdc_item.get('number_of_packs', 0)
+                            kit_components_qty_sum += float(otwdc_item.get('qty_delivered', 0))
+                    
+                    # Update main kit with sum of kit components' number_of_packs and qty_delivered
+                    if kit_components_number_of_packs_sum > 0:
+                        inv_item['number_of_packs'] = kit_components_number_of_packs_sum
+                        inv_item['qty_delivered'] = kit_components_qty_sum
+                        print(f"Debug - Updated main kit {po_sl_no}: number_of_packs={kit_components_number_of_packs_sum}, qty_delivered={kit_components_qty_sum}")
+                    else:
+                        # If no kit components found, keep the original calculation
+                        print(f"Debug - No kit components found for main kit {po_sl_no}, keeping original number_of_packs")
+                
+                # Ensure kit components have unit_price = 0
+                if '.' in po_sl_no:
+                    inv_item['unit_price'] = 0
+                    inv_item['taxable_amt'] = 0
+                    print(f"Debug - Set unit_price and taxable_amt to 0 for kit component {po_sl_no}")
+            
+            odc1 = otwdc_values.first()
+
+            # Filter out unwanted po_sl_no
+            unwanted_po_sl_no = ("fr", "ins", "oc")
+            final_otwdc = [otwdc for otwdc in otwdc_result if otwdc['po_sl_no'] not in unwanted_po_sl_no]
+
+            r = get_object_or_404(CustomerMaster, cust_id=odc1.cust.cust_id if odc1.cust else '')
+            c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
+            gst_rate = get_object_or_404(GstRates, id=1)
+
+            # Calculate total number of packs instead of total quantity
+            total_number_of_packs = sum(float(item.get('number_of_packs', 0) or 0) for item in final_otwdc)
+            
+            # Convert all monetary values to float for proper calculation
+            total_taxable_value = sum(safe_float_conversion(item.get('taxable_amt', 0)) for item in inv_result)
+            total_cgst = sum(safe_float_conversion(item.get('cgst_price', 0)) for item in inv_result)
+            total_sgst = sum(safe_float_conversion(item.get('sgst_price', 0)) for item in inv_result)
+            total_igst = sum(safe_float_conversion(item.get('igst_price', 0)) for item in inv_result)
+
+            grand_total = round(total_taxable_value + total_cgst + total_sgst + total_igst)
+            gt = format_currency(grand_total, 'INR', locale='en_IN')
+            aw = convert_rupees_to_words(grand_total)
+
+            context = {
+                'inv': inv_result,
+                'odc': final_otwdc,
+                'r': model_to_dict(r),
+                'c': model_to_dict(c),
+                'gr': model_to_dict(gst_rate),
+                'odc1': model_to_dict(odc1),
+                'amount': aw,
+                'total_taxable_value': "{:.2f}".format(total_taxable_value),
+                'total_cgst': "{:.2f}".format(total_cgst),
+                'total_sgst': "{:.2f}".format(total_sgst),
+                'total_igst': "{:.2f}".format(total_igst),
+                'gt': gt,
+                'total_qty': total_number_of_packs  # Use total number of packs instead of total quantity
+            }
+            
+            # Debug: Print the first item to see if number_of_packs is included
+            if final_otwdc:
+                print(f"Debug - First item in final_otwdc: {final_otwdc[0]}")
+                print(f"Debug - number_of_packs: {final_otwdc[0].get('number_of_packs')}")
+                print(f"Debug - qty_delivered: {final_otwdc[0].get('qty_delivered')}")
+            
+            # Debug: Print inv_result structure
+            if inv_result:
+                print(f"Debug - First item in inv_result: {inv_result[0]}")
+                print(f"Debug - inv_result number_of_packs: {inv_result[0].get('number_of_packs')}")
+                print(f"Debug - inv_result qty_delivered: {inv_result[0].get('qty_delivered')}")
+            
+                return JsonResponse({"message": "success", "inv_result": inv_result, "context": context}, safe=False)
         
-        odc1 = otwdc_values.first()
-
-        # Filter out unwanted po_sl_no
-        unwanted_po_sl_no = ("fr", "ins", "oc")
-        final_otwdc = [otwdc for otwdc in otwdc_result if otwdc['po_sl_no'] not in unwanted_po_sl_no]
-
-        r = get_object_or_404(CustomerMaster, cust_id=odc1.cust.cust_id if odc1.cust else '')
-        c = get_object_or_404(CustomerMaster, cust_id=odc1.consignee_id)
-        gst_rate = get_object_or_404(GstRates, id=1)
-
-        # Calculate total number of packs instead of total quantity
-        total_number_of_packs = sum(item.get('number_of_packs', 0) for item in final_otwdc)
-        total_taxable_value = sum(item['taxable_amt'] for item in inv_result)
-        total_cgst = sum(item['cgst_price'] for item in inv_result)
-        total_sgst = sum(item['sgst_price'] for item in inv_result)
-        total_igst = sum(item['igst_price'] for item in inv_result)
-
-        grand_total = round(total_taxable_value + total_cgst + total_sgst + total_igst)
-        gt = format_currency(grand_total, 'INR', locale='en_IN')
-        aw = convert_rupees_to_words(grand_total)
-
-        context = {
-            'inv': inv_result,
-            'odc': final_otwdc,
-            'r': model_to_dict(r),
-            'c': model_to_dict(c),
-            'gr': model_to_dict(gst_rate),
-            'odc1': model_to_dict(odc1),
-            'amount': aw,
-            'total_taxable_value': "{:.2f}".format(total_taxable_value),
-            'total_cgst': "{:.2f}".format(total_cgst),
-            'total_sgst': "{:.2f}".format(total_sgst),
-            'total_igst': "{:.2f}".format(total_igst),
-            'gt': gt,
-            'total_qty': total_number_of_packs  # Use total number of packs instead of total quantity
-        }
-        
-        # Debug: Print the first item to see if number_of_packs is included
-        if final_otwdc:
-            print(f"Debug - First item in final_otwdc: {final_otwdc[0]}")
-            print(f"Debug - number_of_packs: {final_otwdc[0].get('number_of_packs')}")
-            print(f"Debug - qty_delivered: {final_otwdc[0].get('qty_delivered')}")
-        
-        # Debug: Print inv_result structure
-        if inv_result:
-            print(f"Debug - First item in inv_result: {inv_result[0]}")
-            print(f"Debug - inv_result number_of_packs: {inv_result[0].get('number_of_packs')}")
-            print(f"Debug - inv_result qty_delivered: {inv_result[0].get('qty_delivered')}")
-        
-        return JsonResponse({"message": "success", "inv_result": inv_result, "context": context}, safe=False)
+        except ObjectDoesNotExist as e:
+            print(f"ObjectDoesNotExist error: {str(e)}")
+            return JsonResponse({"error": f"Required data not found: {str(e)}"}, status=404)
+        except ValueError as e:
+            print(f"ValueError: {str(e)}")
+            return JsonResponse({"error": f"Invalid data format: {str(e)}"}, status=400)
+        except Exception as e:
+            print(f"Unexpected error in invoice_generation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
     else:
         return JsonResponse({"error": "Only GET requests are allowed"}, status=405)
     
@@ -1776,10 +1861,21 @@ def invoice_report(request):
             start_date_str = data.get('startDate')
             end_date_str = data.get('endDate')
 
-            start_datetime = datetime.strptime(start_date_str, "%d-%m-%Y")
-            end_datetime = datetime.strptime(end_date_str, "%d-%m-%Y")
-            start_date = start_datetime.date()
-            end_date = end_datetime.date()
+            # Validate that required fields are provided
+            if not start_date_str or not end_date_str:
+                return JsonResponse({'error': 'Both startDate and endDate are required'}, status=400)
+
+            print(f"Received dates - startDate: {start_date_str}, endDate: {end_date_str}")
+
+            try:
+                start_datetime = datetime.strptime(start_date_str, "%d-%m-%Y")
+                end_datetime = datetime.strptime(end_date_str, "%d-%m-%Y")
+                start_date = start_datetime.date()
+                end_date = end_datetime.date()
+                print(f"Parsed dates - start_date: {start_date}, end_date: {end_date}")
+            except ValueError as date_error:
+                print(f"Date parsing error: {date_error}")
+                return JsonResponse({'error': f'Invalid date format. Expected DD-MM-YYYY. Error: {str(date_error)}'}, status=400)
 
             # Fetch and filter data from the database
 
@@ -1846,7 +1942,10 @@ def invoice_report(request):
             })
             #------------------------------------------------------------------------------------------
 
-            df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+            # Convert all numeric columns to proper numeric types before processing
+            numeric_columns = ['Quantity', 'Ass.Value', 'CGST Price (9%)', 'SGST Price (9%)', 'IGST Price (18%)']
+            for col in numeric_columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
             # Group data according to specific criteria
             grouped = df.groupby(['Invoice Number', 'Invoice Date', 'HSN/SAC']).agg({
@@ -1894,10 +1993,20 @@ def invoice_report(request):
             total_invoice_value = total_taxable_amt + total_igst_price + total_cgst_price + total_sgst_price
             total_invoice_value2 = total_taxable_amt2 + total_igst_price2 + total_cgst_price2 + total_sgst_price2
 
-            combined_df['Invoice Value'] = combined_df['Ass.Value'] + combined_df['IGST Price (18%)'] + combined_df['CGST Price (9%)'] + combined_df['SGST Price (9%)']
-            combined_df['Invoice Value'] = pd.to_numeric(combined_df['Invoice Value']).round()
-            combined_df2['Invoice Value'] = combined_df2['Ass.Value'] + combined_df2['IGST Price (18%)'] + combined_df2['CGST Price (9%)'] + combined_df2['SGST Price (9%)']
-            combined_df2['Invoice Value'] = pd.to_numeric(combined_df2['Invoice Value']).round()
+            # Ensure numeric columns in combined DataFrames are properly converted
+            for col in ['Ass.Value', 'CGST Price (9%)', 'SGST Price (9%)', 'IGST Price (18%)']:
+                combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce').fillna(0)
+                combined_df2[col] = pd.to_numeric(combined_df2[col], errors='coerce').fillna(0)
+            
+            # Calculate invoice values safely
+            combined_df['Invoice Value'] = (combined_df['Ass.Value'] + 
+                                          combined_df['IGST Price (18%)'] + 
+                                          combined_df['CGST Price (9%)'] + 
+                                          combined_df['SGST Price (9%)']).round()
+            combined_df2['Invoice Value'] = (combined_df2['Ass.Value'] + 
+                                           combined_df2['IGST Price (18%)'] + 
+                                           combined_df2['CGST Price (9%)'] + 
+                                           combined_df2['SGST Price (9%)']).round()
 
             total_row = pd.DataFrame({
                 'Sl No': 'Total',
@@ -1938,29 +2047,34 @@ def invoice_report(request):
             combined_df = pd.concat([combined_df, total_row], ignore_index=True)
             combined_df2 = pd.concat([combined_df2, total_row2], ignore_index=True)
 
-            combined_df['Round Off'] = combined_df.apply(
-                lambda row: float(row['Invoice Value']) - (
-                    float(row['Ass.Value']) +
-                    float(row['IGST Price (18%)']) +
-                    float(row['CGST Price (9%)']) +
-                    float(row['SGST Price (9%)'])
-                ) if row['Sl No'] != 'Total' else '',
-                axis=1
-            )
-            combined_df2['Round Off'] = combined_df2.apply(
-                lambda row: float(row['Invoice Value']) - (
-                    float(row['Ass.Value']) +
-                    float(row['IGST Price (18%)']) +
-                    float(row['CGST Price (9%)']) +
-                    float(row['SGST Price (9%)'])
-                ) if row['Sl No'] != 'Total' else '',
-                axis=1
-            )
+            # Calculate rounding differences safely
+            def safe_round_off_calc(row):
+                if row['Sl No'] == 'Total':
+                    return ''
+                try:
+                    invoice_val = pd.to_numeric(row['Invoice Value'], errors='coerce')
+                    ass_val = pd.to_numeric(row['Ass.Value'], errors='coerce')
+                    igst_val = pd.to_numeric(row['IGST Price (18%)'], errors='coerce')
+                    cgst_val = pd.to_numeric(row['CGST Price (9%)'], errors='coerce')
+                    sgst_val = pd.to_numeric(row['SGST Price (9%)'], errors='coerce')
+                    
+                    if pd.isna(invoice_val) or pd.isna(ass_val) or pd.isna(igst_val) or pd.isna(cgst_val) or pd.isna(sgst_val):
+                        return 0
+                    
+                    return invoice_val - (ass_val + igst_val + cgst_val + sgst_val)
+                except:
+                    return 0
+            
+            combined_df['Round Off'] = combined_df.apply(safe_round_off_calc, axis=1)
+            combined_df2['Round Off'] = combined_df2.apply(safe_round_off_calc, axis=1)
 
             # Convert numeric columns to appropriate types without formatting
             numeric_columns = ['Ass.Value', 'IGST Price (18%)', 'CGST Price (9%)', 'SGST Price (9%)', 'Invoice Value', 'Round Off']
-            combined_df[numeric_columns] = combined_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
-            combined_df2[numeric_columns] = combined_df2[numeric_columns].apply(pd.to_numeric, errors='coerce')
+            for col in numeric_columns:
+                if col in combined_df.columns:
+                    combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce').fillna(0)
+                if col in combined_df2.columns:
+                    combined_df2[col] = pd.to_numeric(combined_df2[col], errors='coerce').fillna(0)
 
             combined_df.loc[combined_df['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
             combined_df2.loc[combined_df2['Sl No'] == 'Total', ['Round Off', 'HSN/SAC']] = ''
@@ -1981,8 +2095,23 @@ def invoice_report(request):
 
             return JsonResponse({"data": json.loads(json_data), "data2": json.loads(json_data2)}, safe=False)
 
+        except ValueError as e:
+            print(f"ValueError in invoice_report: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({'error': f"Invalid data format: {str(e)}"}, status=400)
+        except KeyError as e:
+            print(f"KeyError in invoice_report: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({'error': f"Missing required field: {str(e)}"}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            print(f"Unexpected error in invoice_report: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({'error': f"An unexpected error occurred: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
 PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
 
