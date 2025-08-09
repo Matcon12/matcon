@@ -193,8 +193,17 @@ function generateReportSection(title, data) {
                   .map((value, index) => {
                     const alignRight =
                       index >= 6 ? 'style="text-align: right;"' : ""
-                    const formattedValue =
-                      typeof value === "number" ? value.toFixed(2) : value
+
+                    // Special handling for Sl No column (first column) - display as integer
+                    let formattedValue
+                    if (index === 0 && typeof value === "number") {
+                      formattedValue = Math.floor(value).toString()
+                    } else if (typeof value === "number") {
+                      formattedValue = value.toFixed(2)
+                    } else {
+                      formattedValue = value
+                    }
+
                     return `<td ${alignRight}>${formattedValue}</td>`
                   })
                   .join("")}</tr>`
@@ -222,7 +231,17 @@ function applyNumberFormatting(ws) {
     const header = XLSX.utils.encode_col(C) + "1"
     const headerValue = ws[header]?.v
 
-    if (headerValue && numericFields.includes(headerValue)) {
+    if (headerValue === "Sl No") {
+      // Format Sl No column as integers
+      for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        const cell = XLSX.utils.encode_cell({ r: R, c: C })
+        if (ws[cell] && typeof ws[cell].v === "number") {
+          ws[cell].t = "n" // Set cell type to number
+          ws[cell].z = "0" // Set number format as integer
+        }
+      }
+    } else if (headerValue && numericFields.includes(headerValue)) {
+      // Format other numeric fields with 2 decimal places
       for (let R = range.s.r + 1; R <= range.e.r; R++) {
         const cell = XLSX.utils.encode_cell({ r: R, c: C })
         if (ws[cell] && typeof ws[cell].v === "number") {

@@ -1,16 +1,19 @@
 import React, { useState, useRef } from "react"
 import "./InvoicePrint.css"
 import { useReactToPrint } from "react-to-print"
-import Invoice from "../../components/Invoice/Invoice"
+import DcPrint from "../../components/DC/Dc.jsx"
 import api from "../../api/api"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+import { faSpinner } from "@fortawesome/free-solid-svg-icons"
 
-export default function InvoiceReport() {
+export default function DcReport() {
   const [formData, setFormData] = useState({
     invoiceNumber: "",
     year: "2024-25",
   })
 
   const [responseData, setResponseData] = useState()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -27,27 +30,20 @@ export default function InvoiceReport() {
 
   console.log("formdata: ", formData)
 
-  // const generateGcnNumber = (gst_rate, fin_year, fyear) => {
-  //   const padWithZeros = (number, length) => {
-  //     return number.toString().padStart(length, "0")
-  //   }
-
-  //   const gcn_no = formData.invoiceNumber
-  //   return `${padWithZeros(gcn_no, 3)}/${formData.year}`
-  // }
-
-  const InvoiceC = React.forwardRef((props, ref) => (
-    <div ref={ref} className="invoice-container-container">
-      <Invoice ref={ref} formData={responseData} />
+  const DcReportComponent = React.forwardRef((props, ref) => (
+    <div ref={ref} className="dc-container-container">
+      <DcPrint formData={props.formData} />
     </div>
   ))
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setIsLoading(true)
     api
       .get("/invoiceGeneration", {
         params: {
           gcn_no: formData.invoiceNumber,
+          year: formData.year,
         },
       })
       .then((response) => {
@@ -57,10 +53,13 @@ export default function InvoiceReport() {
       .catch((error) => {
         console.log(error.response.data.error)
       })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }
 
   return (
-    <div className="invoice-report-container">
+    <div className="dc-report-container">
       <div className="input-details-container">
         <h3>Delivery Challan:</h3>
         <form onSubmit={handleSubmit} className="input-details-form">
@@ -89,12 +88,20 @@ export default function InvoiceReport() {
             />
             <label alt="Enter the year" placeholder="Year"></label>
           </div>
-          <button type="submit">Get DC</button>
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin /> Loading...
+              </>
+            ) : (
+              "Get DC"
+            )}
+          </button>
         </form>
 
         {responseData && (
           <>
-            <DcPrint formData={responseData} />
+            <DcReportComponent formData={responseData} />
             <div>
               <button onClick={handlePrint}>Print this out!</button>
             </div>

@@ -2,7 +2,7 @@ import "./CustomerDetails.css"
 import { Link } from "react-router-dom"
 import { useState, useEffect } from "react"
 import api from "../../api/api.jsx"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../reuse/ui/AutoCompleteUtil.jsx"
 
 import { ToastContainer, toast } from "react-toastify"
 
@@ -208,7 +208,7 @@ export default function EditCustomerDetails() {
         <form onSubmit={handleSubmit} autoComplete="off">
           <div className="only-inputs">
             <div className="autocomplete-wrapper">
-              <AutoCompleteComponent
+              <AutoCompleteUtil
                 data={customerData}
                 mainData={formData}
                 setData={setCustomerData}
@@ -281,7 +281,7 @@ export default function EditCustomerDetails() {
               ></label>
             </div>
             <div className="autocomplete-wrapper">
-              <AutoCompleteComponent
+              <AutoCompleteUtil
                 data={stateData}
                 mainData={formData}
                 // setData={setStateData}

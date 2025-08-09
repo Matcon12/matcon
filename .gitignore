@@ -1,0 +1,263 @@
+# ========================
+# PROJECT ROOT .gitignore
+# ========================
+
+# Cursor IDE
+.cursor/
+
+# ========================
+# PYTHON/DJANGO FILES
+# ========================
+
+# Database files - CRITICAL to ignore
+*.sqlite3
+*.db
+db.sqlite3
+backup_db.sqlite3
+*.sqbpro
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Django specific
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static/
+
+# Django migrations (optional - you might want to include these)
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# ========================
+# NODE.JS/REACT FILES
+# ========================
+
+# Dependencies
+node_modules/
+jspm_packages/
+
+# Production builds
+/dist
+/build
+dist-ssr/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# NYC test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Production files
+*.local
+
+# ========================
+# SENSITIVE FILES
+# ========================
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Configuration files with secrets
+config.json
+secrets.json
+.secrets
+credentials.json
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cert
+
+# ========================
+# EDITOR FILES
+# ========================
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ========================
+# OPERATING SYSTEM FILES
+# ========================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================
+# DOCKER FILES
+# ========================
+
+# Docker volumes and data
+docker-compose.override.yml
+
+# ========================
+# TEMPORARY FILES
+# ========================
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+commands.txt
+temp_models.py
+
+# Excel files (if they contain sensitive data)
+*.xlsx
+*.xls
+invoiceReports.xlsx
+
+# ========================
+# TESTING FILES
+# ========================
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Test databases
+test_*.sqlite3
+
+# ========================
+# DEPLOYMENT FILES
+# ========================
+
+# Production deployment configs
+docker-compose.prod.yml
+kubernetes/
+helm/
+
+# Backup files
+*.backup
+backup_*

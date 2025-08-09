@@ -24,3 +24,49 @@ body,
 body {
   background-color: var(--background-color);
 }
+
+/* Global button styling */
+button {
+  padding: 0.5em 2em;
+  font-size: 1em;
+  outline: none;
+  border: none;
+  border-radius: 1.25em;
+  color: white;
+  background: var(--primary-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+button[type="submit"] {
+  background: var(--primary-color);
+  color: white;
+  font-weight: 600;
+  min-width: 120px;
+}
+
+button[type="submit"]:hover {
+  background: var(--font-color2);
+}
+
+/* Print button styling */
+button[onClick*="handlePrint"] {
+  background: #28a745;
+  margin: 10px;
+}
+
+button[onClick*="handlePrint"]:hover {
+  background: #218838;
+}

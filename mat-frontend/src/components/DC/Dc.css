@@ -1,9 +1,17 @@
 .dc-container {
   font-size: 11px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 15px 20px 15px 20px;
 }
 
+.dc-container > .dc-content > h2,
 .dc-container > h2 {
   text-align: center;
+  width: 100%;
+  margin: 0 0 10px 0;
 }
 
 .dc-details {
@@ -16,4 +24,30 @@
 
 .a-right {
   text-align: right !important;
+}
+
+.gst_no {
+  margin-top: 15px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.page-break {
+  margin-top: 20px;
+}
+
+/* Responsive styles for better alignment */
+@media screen and (max-width: 800px) {
+  .dc-container {
+    width: 95%;
+    max-width: 600px;
+    padding: 10px 15px;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .dc-container {
+    width: 98%;
+    padding: 10px;
+  }
 }

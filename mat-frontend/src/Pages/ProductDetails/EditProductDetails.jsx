@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import "./ProductDetails.css"
 import api from "../../api/api.jsx"
-import AutoCompleteComponent from "../../components/AutoComplete/AutoCompleteComponent.jsx"
+import AutoCompleteUtil from "../../reuse/ui/AutoCompleteUtil.jsx"
 import { ToastContainer, toast } from "react-toastify"
 
 import "react-toastify/dist/ReactToastify.css"
@@ -46,7 +46,7 @@ export default function EditProductDetails() {
   function parsePackSize(packSize) {
     // Use a regular expression to match the quantity and UOM
     // const regex = /^(\d+)\s*(\w+)$/
-    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i; 
+    const regex = /^(\d+|\d*\.\d+)\s*(Ltr|Kg|No\.)$/i
     const match = packSize.match(regex)
 
     if (match) {
@@ -55,7 +55,7 @@ export default function EditProductDetails() {
         uom: match[2],
       }
     } else {
-      toast.error("Invalid Pack Size Format") 
+      toast.error("Invalid Pack Size Format")
       throw new Error("Invalid pack size format")
       return
     }
@@ -89,7 +89,7 @@ export default function EditProductDetails() {
         toast.success("Successfully fetched data!!")
       })
       .catch((error) => {
-        toast.error("Failed to fetch data") 
+        toast.error("Failed to fetch data")
         console.log(error.response.data.error)
         resetForm()
       })
@@ -139,7 +139,7 @@ export default function EditProductDetails() {
         <form onSubmit={handleSubmit} autoComplete="off">
           <div className="only-inputs">
             <div className="autocomplete-wrapper">
-              <AutoCompleteComponent
+              <AutoCompleteUtil
                 data={productData}
                 mainData={formData}
                 setData={setProductData}

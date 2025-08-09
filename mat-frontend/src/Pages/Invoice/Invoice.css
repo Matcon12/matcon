@@ -1,7 +1,172 @@
+/* Main container styling for PrintInvoice */
+.invoice-report-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.reports-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+}
+
+.reports-header h2 {
+  margin: 0;
+  font-size: 1.8em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.preview-section {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.document-card {
+  width: 80%;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
+
+.document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.document-header h3 {
+  margin: 0;
+  font-size: 1.3em;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.print-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.print-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.document-preview {
+  padding: 10px 20px 20px 20px;
+  background: #fafbfc;
+  min-height: 400px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.scaled-document {
+  transform: scale(0.7);
+  transform-origin: top center;
+  width: 142.86%; /* 100% / 0.7 to maintain proper width after scaling */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 0;
+}
+
+/* DC container for screen view - override print styles */
+.dc-container-container {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: block !important;
+  min-height: auto !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  height: auto !important;
+}
+
+/* Ensure DC inside scaled document has proper spacing */
+.scaled-document .dc-container-container {
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.scaled-document .dc-container {
+  margin: 0 !important;
+  padding: 10px 15px !important;
+  min-height: auto !important;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.skeleton-button {
+  width: 120px;
+  height: 40px;
+  background: linear-gradient(90deg, #e9ecef 25%, #f8f9fa 50%, #e9ecef 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+.skeleton-preview {
+  background: #f1f3f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.skeleton-content {
+  width: 70%;
+  height: 350px;
+  background: linear-gradient(90deg, #e9ecef 25%, #f8f9fa 50%, #e9ecef 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .print-invoice-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .invoice-generation-container {
@@ -29,6 +194,12 @@
   width: 300px !important;
 }
 
+.invoice-input-complete-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .invoice-input-complete-container > div > p {
   margin: 20px 0;
 }
@@ -37,6 +208,31 @@
   display: grid;
   justify-items: center;
   margin: 20px 0;
+}
+
+/* Submit button styling for invoice page */
+.submit-button button {
+  padding: 0.8em 2.5em;
+  font-size: 1.1em;
+  font-weight: 600;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 1.25em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+}
+
+.submit-button button:hover {
+  background: var(--font-color2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.submit-button button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .otherChargesContainer {
@@ -67,12 +263,29 @@
   margin: 0 1em;
 }
 
+/* Invoice container wrapper for proper centering */
 .invoice-container-container {
-  width: 100%;
-  /* height: 100vh; */
-  display: grid;
+  display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.invoice-container {
+  width: 780px;
+  max-width: 100%;
+  margin: 0 auto; /* Center the container */
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  justify-items: center;
+  border: 1px solid black;
+  gap: 20px;
+  font-size: 13px;
+  font-family: "Times New Roman", Times, serif;
+  padding: 10px 30px;
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* .noOfBatches {
@@ -98,6 +311,249 @@
     display: none;
   }
 } */
+
+/* Kit Components Styles */
+.kit-components-section {
+  margin-top: 20px;
+  padding: 15px;
+  border: 2px solid #e3f2fd;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kit-components-header {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #2196f3;
+}
+
+.kit-components-header h4 {
+  color: #1976d2;
+  margin: 0 0 5px 0;
+  font-size: 1.1em;
+}
+
+.kit-info {
+  color: #666;
+  margin: 0;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.batch-count-input {
+  margin-top: 10px;
+  position: relative;
+  display: inline-block;
+  width: 200px;
+}
+
+.batch-count-input input {
+  width: 100%;
+  padding: 8px 12px 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: white;
+  transition: border-color 0.2s ease;
+}
+
+.batch-count-input input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.batch-count-input label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.batch-count-input input:focus + label,
+.batch-count-input input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.kit-components-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.kit-component-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.kit-component-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.kit-component-header strong {
+  color: #1976d2;
+}
+
+.kit-component-details {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 15px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kit-component-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kit-component-info span {
+  font-size: 0.85em;
+  color: #666;
+}
+
+.kit-component-balance {
+  font-size: 0.85em;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.kit-component-balance.low-stock {
+  color: #f44336;
+}
+
+.kit-component-balance.medium-stock {
+  color: #ff9800;
+}
+
+.kit-component-balance.high-stock {
+  color: #4caf50;
+}
+
+.remaining-balance {
+  font-size: 0.8em;
+  color: #666;
+  font-weight: normal;
+}
+
+.kit-component-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 300px;
+}
+
+.kit-component-hsn,
+.kit-component-quantity {
+  position: relative;
+  display: block;
+}
+
+.kit-component-hsn input,
+.kit-component-quantity input {
+  width: 100%;
+  padding: 12px 12px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: transparent;
+  transition: border-color 0.2s ease;
+}
+
+.kit-component-hsn input:focus,
+.kit-component-quantity input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.kit-component-hsn label,
+.kit-component-quantity label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.kit-component-hsn input:focus + label,
+.kit-component-hsn input.has-value + label,
+.kit-component-quantity input:focus + label,
+.kit-component-quantity input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+/* Responsive design for kit components */
+@media (max-width: 768px) {
+  .kit-component-details {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kit-component-fields {
+    grid-template-columns: 1fr;
+    min-width: auto;
+  }
+
+  .kit-component-hsn,
+  .kit-component-quantity {
+    min-width: auto;
+  }
+}
+
+/* Responsive design for entry containers */
+@media (max-width: 768px) {
+  .product-inputs {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .entry-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .entry-content {
+    padding: 15px;
+  }
+}
 
 .input-container-contact,
 .autocomplete-wrapper-invoice {
@@ -126,6 +582,126 @@
   justify-content: space-between;
 }
 
+/* Entry Container Styles */
+.entry-container {
+  margin: 20px 0;
+  border: 2px solid #e3f2fd;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  overflow: hidden;
+  width: 100%;
+  max-width: 1200px;
+  min-width: 800px;
+  box-sizing: border-box;
+}
+
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #1976d2;
+  color: white;
+}
+
+.entry-title h3 {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.entry-subtitle {
+  margin: 5px 0 0 0;
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.delete-button {
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.entry-content {
+  padding: 20px;
+}
+
+.product-selection-section {
+  margin-bottom: 20px;
+}
+
+.product-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-field {
+  position: relative;
+}
+
+.info-field input {
+  width: 100%;
+  padding: 12px 12px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: white;
+  transition: border-color 0.2s ease;
+}
+
+.info-field input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.info-field label {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  color: #999;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 0.75em;
+  background-color: white;
+  white-space: nowrap;
+  z-index: 1;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
+.info-field input:focus + label,
+.info-field input.has-value + label {
+  top: -8px;
+  left: 8px;
+  transform: translateY(0);
+  font-size: 0.75em;
+  color: #1976d2;
+  background-color: white;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
 .individual-container {
   border-top: 1px solid gray;
   padding: 20px;
@@ -135,6 +711,36 @@
   grid-column: 1;
 }
 
+/* Responsive Design for PrintInvoice */
+@media (max-width: 768px) {
+  .invoice-report-container {
+    padding: 15px;
+  }
+
+  .document-card {
+    width: 95%;
+  }
+
+  .document-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .scaled-document {
+    transform: scale(0.5);
+    width: 200%; /* 100% / 0.5 */
+  }
+
+  .reports-header h2 {
+    font-size: 1.4em;
+  }
+
+  .preview-section {
+    gap: 20px;
+  }
+}
+
 @media print {
   html,
   body {
@@ -142,11 +748,77 @@
     overflow: initial !important;
     -webkit-print-color-adjust: exact;
   }
+
+  /* Print styles for modern invoice report container */
+  .invoice-report-container {
+    background-color: transparent;
+    color: black;
+  }
+
+  /* Ensure invoice container is centered during print */
+  .invoice-container-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .invoice-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+    align-self: flex-start;
+  }
+
+  /* Center all content within the invoice */
+  .invoice-container > * {
+    text-align: left;
+  }
+
+  /* Ensure tables are properly left-aligned */
+  table {
+    margin: 0;
+  }
+
+  /* Keep headings left-aligned */
+  h3 {
+    text-align: left !important;
+  }
+
+  /* Keep column content left-aligned */
+  .column {
+    justify-items: start !important;
+  }
+
+  /* DC container styles for proper centering */
+  .dc-container-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .dc-container {
+    margin: 0 auto;
+    page-break-inside: avoid;
+    max-width: 100%;
+  }
+
+  /* Center all content within the DC */
+  .dc-container > * {
+    text-align: center;
+  }
 }
 
 @media print {
   .page-break {
-    margin-top: 5rem;
+    margin-top: 2rem; /* Reduced margin since we have page margins */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -158,5 +830,5 @@
 
 @page {
   size: auto;
-  margin: 40mm 0;
+  margin: 4cm 2cm 3cm 2cm; /* Top, Right, Bottom, Left margins for printer headers/footers */
 }

@@ -74,7 +74,7 @@ export default function Invoice({ formData, rates }) {
       {formData ? (
         <>
           <div className="invoice-container">
-            <p className="tax_invoice_heading">TAX INVOICE</p>
+            <p className="tax_invoice_heading text-center">TAX INVOICE</p>
             <div className="column">
               <InvoiceDetails
                 gcn_no={formData.odc1.gcn_no}
