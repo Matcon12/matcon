@@ -167,9 +167,19 @@ function DcReportC({ formData }) {
                   // Calculate total quantity ensuring it equals number_of_packs * pack_size
                   const isKitComponent =
                     data.po_sl_no && data.po_sl_no.includes(".")
-                  const totalQuantity = isKitComponent
-                    ? (data.number_of_packs * packSize).toFixed(2)
-                    : parseFloat(data.qty_delivered || 0).toFixed(2)
+
+                  const batchQuantity = parseFloat(data.batch_quantity || 0)
+                  const calculatedPacks = packSize
+                    ? (batchQuantity / packSize).toFixed(2)
+                    : 0
+
+                  // const totalQuantity = isKitComponent
+                  //   ? (data.number_of_packs * packSize).toFixed(2)
+                  //   : parseFloat(data.qty_delivered || 0).toFixed(2)
+
+                  const totalQuantity = packSize
+                    ? (parseFloat(calculatedPacks) * packSize).toFixed(2)
+                    : 0
 
                   console.log(`Debug - DC Item ${data.po_sl_no}:`, {
                     po_sl_no: data.po_sl_no,
@@ -195,7 +205,7 @@ function DcReportC({ formData }) {
                         </>
                       )}
                       <td className="a-right">{data.po_sl_no}</td>
-                      <td className="a-right">{data.number_of_packs || 0}</td>
+                      <td className="a-right">{calculatedPacks}</td>
                       <td className="a-right">{data.pack_size}</td>
                       <td className="a-right">{totalQuantity}</td>
                       <td>{unit}</td>

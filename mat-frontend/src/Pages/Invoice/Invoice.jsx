@@ -192,16 +192,58 @@ export default function Invoice() {
             )
           }
 
+          const kitComponentActuals = Array.isArray(entry.kitData)
+            ? entry.kitData.map((kitItem) => {
+                const entered = parseFloat(kitItem.quantity) || 0
+                const pack_size_raw = kitItem.pack_size || "1"
+                const pack_size_match = pack_size_raw
+                  .toString()
+                  .match(/(\d+(?:\.\d+)?)/)
+                const pack_size = pack_size_match
+                  ? parseFloat(pack_size_match[1])
+                  : 1.0
+                return entered * pack_size
+              })
+            : []
+
+          const kitComponentSum = kitComponentActuals.reduce(
+            (sum, v) => sum + v,
+            0
+          )
+
+          // kitComponents (for API)
+          const kitComponents = entry.kitData.map((kitItem, idx) => {
+            const entered = parseFloat(kitItem.quantity) || 0
+            const pack_size_raw = kitItem.pack_size || "1"
+            const pack_size_match = pack_size_raw
+              .toString()
+              .match(/(\d+(?:\.\d+)?)/)
+            const pack_size = pack_size_match
+              ? parseFloat(pack_size_match[1])
+              : 1.0
+            const actual_quantity = entered * pack_size
+            return {
+              po_sl_no: kitItem.po_sl_no,
+              prod_desc: kitItem.prod_desc,
+              hsnSac: kitItem.hsnSac || "",
+              unit_price: kitItem.unit_price,
+              quantity: actual_quantity,
+            }
+          })
+
+          // The main kit product object:
           const baseEntry = {
             poSlNo: entry.poSlNo,
             hsnSac: entry.hsnSac,
-            quantities: kitQuantity, // Use the kit quantity
+            quantities: kitComponentSum,
             noOfBatches: entry.noOfBatches,
             batch_coc_quant: {
               batch: entry.batches,
               coc: entry.cocs,
-              quantity: [kitQuantity.toString()], // Use kit quantity as string in array
+              quantity: [kitComponentSum.toString()],
             },
+            kitComponents: kitComponents,
+            isKitProduct: true,
           }
 
           // Add kit component data if this is a kit product
@@ -248,7 +290,14 @@ export default function Invoice() {
           .map((qty) => Number(qty))
           .filter((qty) => !isNaN(qty) && qty > 0)
 
-        const quantitiesSum = validQuantities.reduce(
+        const validActualQuantities = entry.quantities
+          .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+          .map(
+            (qty) => (parseFloat(qty) || 0) * (parseFloat(entry.pack_size) || 1)
+          )
+          .filter((qty) => !isNaN(qty) && qty > 0)
+
+        const quantitiesSum = validActualQuantities.reduce(
           (sum, quantity) => sum + quantity,
           0
         )
@@ -273,7 +322,10 @@ export default function Invoice() {
           batch_coc_quant: {
             batch: entry.batches,
             coc: entry.cocs,
-            quantity: entry.quantities,
+            quantity: entry.quantities.map((qty, idx) => {
+              const packSize = parseFloat(entry.pack_size) || 1
+              return ((parseFloat(qty) || 0) * packSize).toString()
+            }),
           },
         }
 
@@ -546,11 +598,45 @@ export default function Invoice() {
       const quantity = parseFloat(value) || 0
       const balance = parseFloat(entry.qty_balance) || 0
       const packSize = parseFloat(entry.pack_size) || 1
-      const actualQuantity = quantity * packSize
 
-      if (actualQuantity > balance) {
+      // Create a temporary copy to calculate total quantity across all batches
+      const tempQuantities = [...entry.quantities]
+      tempQuantities[fieldIndex] = value
+
+      // Calculate total quantity across all batches
+      const totalQuantityAcrossAllBatches = tempQuantities
+        .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+        .map((qty) => parseFloat(qty) || 0)
+        .reduce((sum, qty) => sum + qty, 0)
+
+      const totalActualQuantity = totalQuantityAcrossAllBatches * packSize
+
+      // Validate against total balance
+      if (totalActualQuantity > balance) {
+        const maxAllowedTotal = Math.floor(balance / packSize)
+        const currentTotalExcludingThis = tempQuantities
+          .filter(
+            (qty, idx) =>
+              idx !== fieldIndex &&
+              qty !== "" &&
+              qty !== null &&
+              qty !== undefined
+          )
+          .map((qty) => parseFloat(qty) || 0)
+          .reduce((sum, qty) => sum + qty, 0)
+
+        const maxAllowedForThisField = Math.max(
+          0,
+          maxAllowedTotal - currentTotalExcludingThis
+        )
+
         toast.warning(
-          `Quantity cannot exceed available balance. You entered ${quantity} × ${packSize} = ${actualQuantity} units, but only ${balance} units are available.`
+          `Total quantity across all batches cannot exceed available balance. ` +
+            `You're trying to use ${totalQuantityAcrossAllBatches} × ${packSize} = ${totalActualQuantity} units, ` +
+            `but only ${balance} units are available. ` +
+            `Maximum allowed for this batch: ${maxAllowedForThisField} (${
+              maxAllowedForThisField * packSize
+            } units)`
         )
         return
       }
@@ -614,6 +700,30 @@ export default function Invoice() {
 
       setEntries(newEntries)
     }
+  }
+
+  const getTotalRemainingBalance = (item) => {
+    const balance = parseFloat(item.qty_balance) || 0
+    const packSize = parseFloat(item.pack_size) || 1
+
+    // Check if this is a kit component (doesn't have quantities array)
+    if (!item.quantities) {
+      // For kit components, calculate remaining balance based on individual quantity
+      const quantity = parseFloat(item.quantity) || 0
+      const actualQuantity = quantity * packSize
+      const remaining = Math.max(0, balance - actualQuantity)
+      return remaining.toFixed(2)
+    }
+
+    // For regular entries with quantities array
+    const totalQuantityUsed = item.quantities
+      .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+      .map((qty) => parseFloat(qty) || 0)
+      .reduce((sum, qty) => sum + qty, 0)
+
+    const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remaining = Math.max(0, balance - totalActualQuantityUsed)
+    return remaining.toFixed(2)
   }
 
   const handleKitInputFocus = (e) => {
@@ -700,6 +810,47 @@ export default function Invoice() {
 
   const handleDelete = (index) => {
     setEntries(entries.filter((data, idx) => idx != index))
+  }
+
+  const getRemainingBalanceForBatch = (entry, currentBatchIndex) => {
+    const totalBalance = parseFloat(entry.qty_balance) || 0
+    const packSize = parseFloat(entry.pack_size) || 1
+
+    // Calculate total quantity used across all batches
+    const totalQuantityUsed = entry.quantities
+      .filter((qty, index) => {
+        // Include all quantities except the current batch we're calculating for
+        return (
+          qty !== "" &&
+          qty !== null &&
+          qty !== undefined &&
+          index !== currentBatchIndex
+        )
+      })
+      .map((qty) => parseFloat(qty) || 0)
+      .reduce((sum, qty) => sum + qty, 0)
+
+    const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remainingBalance = Math.max(0, totalBalance - totalActualQuantityUsed)
+
+    return remainingBalance.toFixed(2)
+  }
+
+  // Alternative: Get remaining balance including current batch quantity
+  const getCurrentRemainingBalance = (entry, currentBatchIndex) => {
+    const totalBalance = parseFloat(entry.qty_balance) || 0
+    const packSize = parseFloat(entry.pack_size) || 1
+
+    // Calculate total quantity used across all batches including current
+    const totalQuantityUsed = entry.quantities
+      .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+      .map((qty) => parseFloat(qty) || 0)
+      .reduce((sum, qty) => sum + qty, 0)
+
+    const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remainingBalance = Math.max(0, totalBalance - totalActualQuantityUsed)
+
+    return remainingBalance.toFixed(2)
   }
 
   return (
@@ -1023,24 +1174,41 @@ export default function Invoice() {
                                       </span>
                                       <span
                                         className={`kit-component-balance ${getStockLevelClass(
-                                          entry.qty_balance
+                                          getRemainingBalanceForBatch(
+                                            entry,
+                                            fieldIndex
+                                          )
                                         )}`}
                                       >
-                                        Balance:{" "}
-                                        {formatBalance(entry.qty_balance)}{" "}
+                                        Available Balance:{" "}
+                                        {getRemainingBalanceForBatch(
+                                          entry,
+                                          fieldIndex
+                                        )}{" "}
                                         {getUOMWithFallback(entry)}
                                         {quantity &&
                                           parseFloat(quantity) > 0 && (
-                                            <span className="remaining-balance">
+                                            <span className="current-usage">
                                               {" "}
-                                              (Remaining:{" "}
-                                              {getNonKitRemainingBalance(
-                                                entry,
-                                                fieldIndex
-                                              )}
-                                              )
+                                              (Using:{" "}
+                                              {(
+                                                parseFloat(quantity) *
+                                                parseFloat(entry.pack_size || 1)
+                                              ).toFixed(2)}{" "}
+                                              {getUOMWithFallback(entry)})
                                             </span>
                                           )}
+                                      </span>
+                                      <span className="total-balance-info">
+                                        Total Balance:{" "}
+                                        {formatBalance(entry.qty_balance)}{" "}
+                                        {getUOMWithFallback(entry)}| Overall
+                                        Remaining:{" "}
+                                        {getCurrentRemainingBalance(
+                                          entry,
+                                          fieldIndex
+                                        )}{" "}
+                                        {getUOMWithFallback(entry)}
                                       </span>
                                     </div>
                                     <div className="kit-component-fields">
@@ -1153,7 +1321,10 @@ export default function Invoice() {
                                             <span className="remaining-balance">
                                               {" "}
                                               (Remaining:{" "}
-                                              {getRemainingBalance(kitItem)})
+                                              {getTotalRemainingBalance(
+                                                kitItem
+                                              )}
+                                              )
                                             </span>
                                           )}
                                       </span>

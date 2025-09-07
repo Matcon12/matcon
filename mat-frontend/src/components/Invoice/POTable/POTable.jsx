@@ -125,7 +125,7 @@ export default function POTable({
                     "Packing forwarding with Freight charges" &&
                   (data.po_sl_no && data.po_sl_no.includes(".")
                     ? (data.number_of_packs * packSize).toFixed(2)
-                    : data.number_of_packs || data.qty_delivered)}
+                    : (Number(data.qty_delivered) || 0).toFixed(2))}
               </td>
               <td className="col6">{unit}</td>
               <td className="col7">{data.unit_price.toFixed(2)}</td>
