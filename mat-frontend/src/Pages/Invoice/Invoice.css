@@ -553,6 +553,12 @@
   .entry-content {
     padding: 15px;
   }
+
+  .kit-total-container,
+  .autocomplete-wrapper,
+  .product-info {
+    grid-column: unset;
+  }
 }
 
 .input-container-contact,
@@ -650,10 +656,25 @@
   box-sizing: border-box;
 }
 
+.product-inputs .autocomplete-wrapper,
+.product-inputs .kit-total-container {
+  grid-column: 1;
+}
+
+.kit-total-container {
+  margin-top: 6px;
+  margin-bottom: 4px;
+  display: block;
+}
+
 .product-info {
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.product-inputs .product-info {
+  grid-column: 2;
 }
 
 .info-field {

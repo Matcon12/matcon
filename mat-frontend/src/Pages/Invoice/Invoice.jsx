@@ -202,7 +202,7 @@ export default function Invoice() {
                 const pack_size = pack_size_match
                   ? parseFloat(pack_size_match[1])
                   : 1.0
-                return entered * pack_size
+                return entered
               })
             : []
 
@@ -221,7 +221,7 @@ export default function Invoice() {
             const pack_size = pack_size_match
               ? parseFloat(pack_size_match[1])
               : 1.0
-            const actual_quantity = entered * pack_size
+            const actual_quantity = entered
             return {
               po_sl_no: kitItem.po_sl_no,
               prod_desc: kitItem.prod_desc,
@@ -273,7 +273,7 @@ export default function Invoice() {
                 prod_desc: kitItem.prod_desc,
                 hsnSac: kitItem.hsnSac || "",
                 unit_price: kitItem.unit_price,
-                quantity: actual_quantity, // Send actual quantity (number_of_packs * pack_size)
+                quantity: number_of_packs, // Send actual quantity (number_of_packs * pack_size)
               }
             })
 
@@ -297,7 +297,7 @@ export default function Invoice() {
           )
           .filter((qty) => !isNaN(qty) && qty > 0)
 
-        const quantitiesSum = validActualQuantities.reduce(
+        const quantitiesSum = validQuantities.reduce(
           (sum, quantity) => sum + quantity,
           0
         )
@@ -324,7 +324,7 @@ export default function Invoice() {
             coc: entry.cocs,
             quantity: entry.quantities.map((qty, idx) => {
               const packSize = parseFloat(entry.pack_size) || 1
-              return ((parseFloat(qty) || 0) * packSize).toString()
+              return (parseFloat(qty) || 0).toString()
             }),
           },
         }
@@ -540,12 +540,12 @@ export default function Invoice() {
       const kitItem = newEntries[entryIndex].kitData[kitIndex]
       const quantity = parseFloat(value) || 0
       const balance = parseFloat(kitItem.qty_balance) || 0
-      const packSize = parseFloat(kitItem.pack_size) || 1
-      const actualQuantity = quantity * packSize
+      // const packSize = parseFloat(kitItem.pack_size) || 1
+      // const actualQuantity = quantity * packSize
 
-      if (actualQuantity > balance) {
+      if (quantity > balance) {
         toast.warning(
-          `Quantity cannot exceed available balance. You entered ${quantity} × ${packSize} = ${actualQuantity} units, but only ${balance} units are available.`
+          `Quantity cannot exceed available balance. You entered ${quantity}, but only ${balance} units are available.`
         )
         return
       }
@@ -609,10 +609,10 @@ export default function Invoice() {
         .map((qty) => parseFloat(qty) || 0)
         .reduce((sum, qty) => sum + qty, 0)
 
-      const totalActualQuantity = totalQuantityAcrossAllBatches * packSize
+      // const totalActualQuantity = totalQuantityAcrossAllBatches * packSize
 
       // Validate against total balance
-      if (totalActualQuantity > balance) {
+      if (totalQuantityAcrossAllBatches > balance) {
         const maxAllowedTotal = Math.floor(balance / packSize)
         const currentTotalExcludingThis = tempQuantities
           .filter(
@@ -632,17 +632,27 @@ export default function Invoice() {
 
         toast.warning(
           `Total quantity across all batches cannot exceed available balance. ` +
-            `You're trying to use ${totalQuantityAcrossAllBatches} × ${packSize} = ${totalActualQuantity} units, ` +
+            `You're trying to use ${totalQuantityAcrossAllBatches}, ` +
             `but only ${balance} units are available. ` +
-            `Maximum allowed for this batch: ${maxAllowedForThisField} (${
-              maxAllowedForThisField * packSize
-            } units)`
+            `Maximum allowed for this batch: ${maxAllowedForThisField} (${maxAllowedForThisField})`
         )
         return
       }
 
       newEntries[entryIndex].quantities[fieldIndex] = value
       setEntries(newEntries)
+    }
+  }
+
+  const validateNonKitQuantityMultiple = (entryIndex, fieldIndex, value) => {
+    const entry = entries[entryIndex]
+    const quantity = parseFloat(value) || 0
+    const packSize = parseFloat(entry.pack_size) || 1
+    if (packSize === 0) return
+    if (Math.abs(quantity % packSize) > 0.0001) {
+      toast.warning(
+        `Quantity must be a multiple of pack size (${packSize}). Entered: ${quantity}`
+      )
     }
   }
 
@@ -710,8 +720,8 @@ export default function Invoice() {
     if (!item.quantities) {
       // For kit components, calculate remaining balance based on individual quantity
       const quantity = parseFloat(item.quantity) || 0
-      const actualQuantity = quantity * packSize
-      const remaining = Math.max(0, balance - actualQuantity)
+      // const actualQuantity = quantity * packSize
+      const remaining = Math.max(0, balance - quantity)
       return remaining.toFixed(2)
     }
 
@@ -721,8 +731,8 @@ export default function Invoice() {
       .map((qty) => parseFloat(qty) || 0)
       .reduce((sum, qty) => sum + qty, 0)
 
-    const totalActualQuantityUsed = totalQuantityUsed * packSize
-    const remaining = Math.max(0, balance - totalActualQuantityUsed)
+    // const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remaining = Math.max(0, balance - totalQuantityUsed)
     return remaining.toFixed(2)
   }
 
@@ -735,6 +745,39 @@ export default function Invoice() {
       e.target.classList.remove("has-value")
     } else {
       e.target.classList.add("has-value")
+    }
+  }
+
+  const handleNonKitInputBlur = (e, entryIndex, fieldIndex) => {
+    if (!e.target.value || e.target.value.trim() === "") {
+      e.target.classList.remove("has-value")
+    } else {
+      e.target.classList.add("has-value")
+      const entry = entries[entryIndex]
+      const quantity = parseFloat(e.target.value) || 0
+      const packSize = parseFloat(entry?.pack_size) || 1
+      if (packSize && Math.abs(quantity % packSize) != 0) {
+        toast.warning(
+          `Quantity must be a multiple of pack size (${packSize}). Entered: ${quantity}`
+        )
+      }
+    }
+  }
+
+  const handleValidateKitInputBlur = (e, entryIndex, kitIndex) => {
+    if (!e.target.value || e.target.value.trim() === "") {
+      e.target.classList.remove("has-value")
+    } else {
+      e.target.classList.add("has-value")
+      const kitItem = entries[entryIndex]?.kitData?.[kitIndex]
+      console.log("kitIndex, entryIndex:", kitIndex, entryIndex)
+      const quantity = parseFloat(e.target.value) || 0
+      const packSize = parseFloat(kitItem?.pack_size) || 1
+      if (packSize && Math.abs(quantity % packSize) != 0) {
+        toast.warning(
+          `Kit component quantity must be a multiple of pack size (${packSize}). Entered: ${quantity}`
+        )
+      }
     }
   }
 
@@ -758,8 +801,8 @@ export default function Invoice() {
     const balance = parseFloat(kitItem.qty_balance) || 0
     const quantity = parseFloat(kitItem.quantity) || 0
     const packSize = parseFloat(kitItem.pack_size) || 1
-    const actualQuantity = quantity * packSize
-    const remaining = Math.max(0, balance - actualQuantity)
+    // const actualQuantity = quantity * packSize
+    const remaining = Math.max(0, balance - quantity)
     return remaining.toFixed(2)
   }
 
@@ -767,8 +810,8 @@ export default function Invoice() {
     const balance = parseFloat(entry.qty_balance) || 0
     const quantity = parseFloat(entry.quantities[fieldIndex]) || 0
     const packSize = parseFloat(entry.pack_size) || 1
-    const actualQuantity = quantity * packSize
-    const remaining = Math.max(0, balance - actualQuantity)
+    // const actualQuantity = quantity * packSize
+    const remaining = Math.max(0, balance - quantity)
     return remaining.toFixed(2)
   }
 
@@ -830,8 +873,8 @@ export default function Invoice() {
       .map((qty) => parseFloat(qty) || 0)
       .reduce((sum, qty) => sum + qty, 0)
 
-    const totalActualQuantityUsed = totalQuantityUsed * packSize
-    const remainingBalance = Math.max(0, totalBalance - totalActualQuantityUsed)
+    // const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remainingBalance = Math.max(0, totalBalance - totalQuantityUsed)
 
     return remainingBalance.toFixed(2)
   }
@@ -847,8 +890,8 @@ export default function Invoice() {
       .map((qty) => parseFloat(qty) || 0)
       .reduce((sum, qty) => sum + qty, 0)
 
-    const totalActualQuantityUsed = totalQuantityUsed * packSize
-    const remainingBalance = Math.max(0, totalBalance - totalActualQuantityUsed)
+    // const totalActualQuantityUsed = totalQuantityUsed * packSize
+    const remainingBalance = Math.max(0, totalBalance - totalQuantityUsed)
 
     return remainingBalance.toFixed(2)
   }
@@ -1033,27 +1076,40 @@ export default function Invoice() {
                     <div className="entry-content">
                       <div className="product-selection-section">
                         <div className="product-inputs">
-                          <div className="autocomplete-wrapper">
-                            <AutoCompleteUtil
-                              data={purchaseOrderDetails}
-                              mainData={entries}
-                              setData={setPurchaseOrderDetails}
-                              setMainData={setEntries}
-                              handleArrayChange={(e) =>
-                                handleChange(
-                                  entryIndex,
-                                  undefined,
-                                  "poSlNo",
-                                  e.target.value
-                                )
-                              }
-                              name="poSlNo"
-                              placeholder="PO Sl No."
-                              search_value="po_sl_no"
-                              setPoSlNo={setPoSlNo}
-                              array={true}
-                              index={entryIndex}
-                            />
+                          <div>
+                            <div className="autocomplete-wrapper">
+                              <AutoCompleteUtil
+                                data={purchaseOrderDetails}
+                                mainData={entries}
+                                setData={setPurchaseOrderDetails}
+                                setMainData={setEntries}
+                                handleArrayChange={(e) =>
+                                  handleChange(
+                                    entryIndex,
+                                    undefined,
+                                    "poSlNo",
+                                    e.target.value
+                                  )
+                                }
+                                name="poSlNo"
+                                placeholder="PO Sl No."
+                                search_value="po_sl_no"
+                                setPoSlNo={setPoSlNo}
+                                array={true}
+                                index={entryIndex}
+                              />
+                            </div>
+                            {entry.isKit && (
+                              <div className="kit-total-container">
+                                Total amount: ₹
+                                {/* {Number(entry.unit_price).toFixed(2)} ×{" "}
+                              {Number(entry.kitQuantity || 0)} = ₹ */}
+                                {(
+                                  Number(entry.unit_price) *
+                                  Number(entry.kitQuantity || 0)
+                                ).toFixed(2)}
+                              </div>
+                            )}
                           </div>
                           <div className="product-info">
                             <div className="info-field">
@@ -1095,27 +1151,38 @@ export default function Invoice() {
                             </div>
                             {/* Quantity field for kit products */}
                             {entry.isKit && (
-                              <div className="info-field">
-                                <input
-                                  type="number"
-                                  name="kitQuantity"
-                                  value={entry.kitQuantity || ""}
-                                  onChange={(e) =>
-                                    handleChange(
-                                      entryIndex,
-                                      null,
-                                      "kitQuantity",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder=" "
-                                  min="1"
-                                  step="1"
-                                  onFocus={handleKitInputFocus}
-                                  onBlur={handleKitInputBlur}
-                                />
-                                <label>Kit Quantity</label>
-                              </div>
+                              <>
+                                <div className="info-field">
+                                  <input
+                                    type="number"
+                                    name="kitQuantity"
+                                    value={entry.kitQuantity || ""}
+                                    onChange={(e) =>
+                                      handleChange(
+                                        entryIndex,
+                                        null,
+                                        "kitQuantity",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder=" "
+                                    min="1"
+                                    step="1"
+                                    onFocus={handleKitInputFocus}
+                                    onBlur={handleKitInputBlur}
+                                  />
+                                  <label>Kit Quantity</label>
+                                </div>
+                                {/* <span>
+                                  Total amount: ₹
+                                  {Number(entry.unit_price).toFixed(2)} ×{" "}
+                                  {Number(entry.kitQuantity || 0)}= ₹
+                                  {(
+                                    Number(entry.unit_price) *
+                                    Number(entry.kitQuantity || 0)
+                                  ).toFixed(2)}
+                                </span> */}
+                              </>
                             )}
                           </div>
                         </div>
@@ -1166,9 +1233,28 @@ export default function Invoice() {
                                   </div>
                                   <div className="kit-component-details">
                                     <div className="kit-component-info">
-                                      <span>Product: {entry.prod_desc}</span>
+                                      {/* <span>Product: {entry.prod_desc}</span>
                                       <span>HSN/SAC: {entry.hsnSac}</span>
-                                      <span>PO Sl No: {entry.poSlNo}</span>
+                                      <span>PO Sl No: {entry.poSlNo}</span> */}
+                                      <span>
+                                        Unit Price: ₹
+                                        {Number(entry.unit_price).toFixed(2)}
+                                      </span>
+                                      <span>
+                                        Total amount: ₹
+                                        {(
+                                          Number(entry.unit_price) *
+                                          entry.quantities
+                                            .filter(
+                                              (qty) =>
+                                                qty !== "" &&
+                                                qty !== null &&
+                                                qty !== undefined
+                                            )
+                                            .map((qty) => Number(qty))
+                                            .reduce((sum, qty) => sum + qty, 0)
+                                        ).toFixed(2)}
+                                      </span>
                                       <span>
                                         Pack Size: {entry.pack_size || "N/A"}
                                       </span>
@@ -1191,10 +1277,9 @@ export default function Invoice() {
                                             <span className="current-usage">
                                               {" "}
                                               (Using:{" "}
-                                              {(
-                                                parseFloat(quantity) *
-                                                parseFloat(entry.pack_size || 1)
-                                              ).toFixed(2)}{" "}
+                                              {parseFloat(quantity).toFixed(
+                                                2
+                                              )}{" "}
                                               {getUOMWithFallback(entry)})
                                             </span>
                                           )}
@@ -1226,7 +1311,13 @@ export default function Invoice() {
                                           }
                                           placeholder=" "
                                           onFocus={handleKitInputFocus}
-                                          onBlur={handleKitInputBlur}
+                                          onBlur={(e) =>
+                                            handleNonKitInputBlur(
+                                              e,
+                                              entryIndex,
+                                              fieldIndex
+                                            )
+                                          }
                                         />
                                         <label>Quantity</label>
                                       </div>
@@ -1267,7 +1358,7 @@ export default function Invoice() {
                               <p className="kit-info">
                                 Enter quantities for each kit component
                               </p>
-                              <button
+                              {/* <button
                                 type="button"
                                 onClick={() => {
                                   console.log(
@@ -1287,7 +1378,7 @@ export default function Invoice() {
                                 }}
                               >
                                 Debug Kit Data
-                              </button>
+                              </button> */}
                             </div>
                             <div className="kit-components-container">
                               {entry.kitData.map((kitItem, kitIndex) => (
@@ -1301,10 +1392,19 @@ export default function Invoice() {
                                   </div>
                                   <div className="kit-component-details">
                                     <div className="kit-component-info">
-                                      <span>PO Sl No: {kitItem.po_sl_no}</span>
-                                      <span>
+                                      {/* <span>PO Sl No: {kitItem.po_sl_no}</span> */}
+                                      {/* <span>
                                         Unit Price: ₹{kitItem.unit_price}
                                       </span>
+                                      <span>
+                                        Total amount: ₹
+                                        {Number(entry.unit_price).toFixed(2)} ×{" "}
+                                        {Number(entry.kitQuantity || 0)}= ₹
+                                        {(
+                                          Number(entry.unit_price) *
+                                          Number(entry.kitQuantity || 0)
+                                        ).toFixed(2)}
+                                      </span> */}
                                       <span>
                                         Pack Size: {kitItem.pack_size || "N/A"}
                                       </span>
@@ -1346,7 +1446,13 @@ export default function Invoice() {
                                           min="0"
                                           step="0.01"
                                           onFocus={handleKitInputFocus}
-                                          onBlur={handleKitInputBlur}
+                                          onBlur={(e) =>
+                                            handleValidateKitInputBlur(
+                                              e,
+                                              entryIndex,
+                                              kitIndex
+                                            )
+                                          }
                                         />
                                         <label>Quantity</label>
                                       </div>
