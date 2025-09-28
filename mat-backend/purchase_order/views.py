@@ -24,9 +24,9 @@ from babel.numbers import format_currency
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.forms.models import model_to_dict
-from collections import Counter
+from collections import Counter, defaultdict
 from django.core.exceptions import ValidationError
-from decimal import Decimal, ROUND_DOWN, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, ROUND_DOWN, InvalidOperation
 from .serializers import UserSerializer
 
 import logging
@@ -117,7 +117,8 @@ def get_customer_detail(request):
     return JsonResponse({'error': 'Only GET requests are allowed'}, status=405)
   
 def round_decimal(value, decimal_places=2):
-    return Decimal(value).quantize(Decimal(f'1.{"0"*decimal_places}'), rounding=ROUND_DOWN)
+    # return Decimal(value).quantize(Decimal(f'1.{"0"*decimal_places}'), rounding=ROUND_DOWN)
+    return Decimal(str(value)).quantize(Decimal(f"1.{'0'*decimal_places}"), rounding=ROUND_HALF_UP)
 
 from django.core.exceptions import ValidationError
 
@@ -808,226 +809,353 @@ def update_product_details(request):
 #   }
 # }
 
+def safe_float(val, default=0.0):
+    try:
+        return float(val) if val not in [None, ""] else default
+    except (ValueError, TypeError):
+        return default
+
+def safe_decimal(val, default=Decimal("0")):
+    try:
+        if val in [None, "", "“”", "’’"]:
+            return default
+        return Decimal(str(val))
+    except (InvalidOperation, ValueError, TypeError):
+        return default
+
 @csrf_exempt
 def invoice_processing(request):
     try:
-        data = json.loads(request.body.decode('utf-8')) 
-        po_no = data['formData2'].get('poNo', '').strip()
-        cust_id = data['formData2'].get('customerId')
-        new_cons_id = data['formData2'].get('newConsigneeName', '')
-        contact_name = data['formData2'].get('contactName')
-        freight_charges = data['formData2'].get('freightCharges')
-        insurance_charges = data['formData2'].get('insuranceCharges')
-        other_charges = data['formData2'].get('otherCharges', {"value": 0, "key": ""})
+        with transaction.atomic():
+            data = json.loads(request.body.decode('utf-8')) 
+            po_no = data['formData2'].get('poNo', '').strip()
+            cust_id = data['formData2'].get('customerId')
+            new_cons_id = data['formData2'].get('newConsigneeName', '')
+            contact_name = data['formData2'].get('contactName')
+            freight_charges = data['formData2'].get('freightCharges')
+            insurance_charges = data['formData2'].get('insuranceCharges')
+            other_charges = data['formData2'].get('otherCharges', {"value": 0, "key": ""})
 
-        contact_nums = CustomerMaster.objects.filter(cust_id=cust_id).values().first()
-        if not contact_nums:
-            return JsonResponse({"error": "Customer not found"}, status=404)
+            contact_nums = CustomerMaster.objects.filter(cust_id=cust_id).values().first()
+            if not contact_nums:
+                return JsonResponse({"error": "Customer not found"}, status=404)
 
-        gst_exemption = contact_nums.get('gst_exemption', False)
-        contact = contact_nums['contact_phone_1'] if contact_nums['contact_name_1'] == contact_name else contact_nums['contact_phone_2']
+            gst_exemption = contact_nums.get('gst_exemption', False)
+            contact = contact_nums['contact_phone_1'] if contact_nums['contact_name_1'] == contact_name else contact_nums['contact_phone_2']
 
-        po_sl_numbers, qty_tobe_del, hsn, noOfBatches = [], [], [], []
-        batch_coc_quant, extra_rows = {}, []
+            po_sl_numbers, qty_tobe_del, hsn, noOfBatches = [], [], [], []
+            batch_coc_quant, extra_rows = {}, []
 
-        # Process PO items
-        for item in data['formData2']['items']:
-            po_sl_numbers.append(item['poSlNo'])
-            qty_tobe_del.append(item['quantities'])
-            hsn.append(item['hsnSac'])
-            noOfBatches.append(item['noOfBatches'])
-            batch_coc_quant[item['poSlNo']] = item['batch_coc_quant']
+            # Process PO items
+            for item in data['formData2']['items']:
+                po_sl_numbers.append(item['poSlNo'])
 
-            # Handle Kit Components
-            if item.get("isKitProduct") and "kitComponents" in item:
-                for comp in item["kitComponents"]:
-                    comp_row = {
-                        "slno": None,
-                        "pono": po_no,
-                        "podate": None,
-                        "quote_id": '',
-                        "quote_date": None,
-                        "cust_id": cust_id,
-                        "consignee_id": new_cons_id if new_cons_id else cust_id,
-                        "po_sl_no": comp.get("po_sl_no"),
-                        "prod_code": comp.get("prod_code", ""),
-                        "prod_desc": comp.get("prod_desc", ""),
-                        "additional_desc": comp.get("additional_desc", ""),
-                        "pack_size": comp.get("pack_size", 1),
-                        "quantity": float(comp.get("quantity", 0)),
-                        "unit_price": float(comp.get("unit_price", 0)),
-                        "uom": comp.get("uom", "No"),
-                        "hsn_sac": comp.get("hsnSac", ""),
-                        "total_price": float(comp.get("quantity", 0)) * float(comp.get("unit_price", 0)),
-                        "qty_balance": float(comp.get("quantity", 0)),
-                        "qty_sent": 0,
-                        "delivery_date": None,
-                        "po_validity": None,
-                        "gst_exemption": '',
-                        "gcn_no": "",
-                        "gcn_date": "",
-                        "location": "",
-                        "qty_tobe_del": float(comp.get("quantity", 0)),
-                        "noOfBatches": comp.get("noOfBatches", 1)
+                quantities = item.get('quantities', 0)
+                if isinstance(quantities, str):
+                    qty_value = safe_float(quantities)
+                else:
+                    qty_value = sum(safe_float(q) for q in quantities)
+                qty_tobe_del.append(qty_value)
+
+                hsn.append(item['hsnSac'])
+
+                if item.get("isKitProduct"):
+                    noOfBatches.append(1)  # Kit parent is treated as 1 batch
+                else:
+                    noOfBatches.append(item.get('noOfBatches', 1))
+
+                if 'batch_coc_quant' in item:
+                    batch_coc_quant[item['poSlNo']] = item['batch_coc_quant']
+
+                # Handle Kit Components
+                if item.get("isKitProduct") and "kitComponents" in item:
+                    for comp in item["kitComponents"]:
+                        comp_row = {
+                            "slno": None,
+                            "pono": po_no,
+                            "podate": None,
+                            "quote_id": '',
+                            "quote_date": None,
+                            "cust_id": cust_id,
+                            "consignee_id": new_cons_id if new_cons_id else cust_id,
+                            "po_sl_no": comp.get("po_sl_no"),
+                            "prod_code": comp.get("prod_code", ""),
+                            "prod_desc": comp.get("prod_desc", ""),
+                            "additional_desc": comp.get("additional_desc", ""),
+                            "pack_size": comp.get("pack_size", 1),
+                            "quantity": safe_float(comp.get("quantity", 0)),
+                            "unit_price": safe_float(comp.get("unit_price", 0)),
+                            "uom": comp.get("uom", "No"),
+                            "hsn_sac": comp.get("hsnSac", ""),
+                            "total_price": safe_float(comp.get("quantity", 0)) * safe_float(comp.get("unit_price", 0)),
+                            "qty_balance": safe_float(comp.get("quantity", 0)),
+                            "qty_sent": 0,
+                            "delivery_date": None,
+                            "po_validity": None,
+                            "gst_exemption": '',
+                            "gcn_no": "",
+                            "gcn_date": "",
+                            "location": "",
+                            "qty_tobe_del": safe_float(comp.get("quantity", 0)),
+                            "noOfBatches": comp.get("noOfBatches", 1)
+                        }
+                        extra_rows.append(comp_row)
+
+                        # Update control arrays
+                        po_sl_numbers.append(comp.get("po_sl_no"))
+                        qty_tobe_del.append(comp_row["qty_tobe_del"])
+                        hsn.append(comp.get("hsnSac", ""))
+                        noOfBatches.append(comp_row["noOfBatches"])
+                        batch_coc_quant[comp.get("po_sl_no")] = {
+                            "batch": comp.get("batch", [""] * comp_row["noOfBatches"]),
+                            "coc": comp.get("coc", [""] * comp_row["noOfBatches"]),
+                            "quantity": [
+                                q if q not in [None, "", "“”", "’’"] else "0"
+                                for q in comp.get("quantity_list", [comp_row["qty_tobe_del"]] * comp_row["noOfBatches"])
+                            ]
+                        }
+
+                    # Create batch entry for kit parent
+                    batch_coc_quant[item['poSlNo']] = {
+                        "batch": [None],
+                        "coc": [""],
+                        "quantity": [str(item['quantities'])]  # Total kit quantity
                     }
-                    extra_rows.append(comp_row)
 
-                    # Update control arrays
-                    po_sl_numbers.append(comp.get("po_sl_no"))
-                    qty_tobe_del.append(comp_row["qty_tobe_del"])
-                    hsn.append(comp.get("hsnSac", ""))
-                    noOfBatches.append(comp_row["noOfBatches"])
-                    batch_coc_quant[comp.get("po_sl_no")] = {
-                        "batch": comp.get("batch", [""] * comp_row["noOfBatches"]),
-                        "coc": comp.get("coc", [""] * comp_row["noOfBatches"]),
-                        "quantity": comp.get("quantity_list", [comp_row["qty_tobe_del"]] * comp_row["noOfBatches"])
-                    }
-
-        # Fetch DB rows
-        data_inw = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=po_sl_numbers)
-        df_inw = pd.DataFrame(list(data_inw.values()))
-    
-        if df_inw.empty:
-            return JsonResponse({"error": "No matching records in the database"}, status=404)
-
-        # Append kit rows
-        # if extra_rows:
-        #     df_inw = pd.concat([df_inw, pd.DataFrame(extra_rows)], ignore_index=True)
-
-        # GST exemption fallback
-        if gst_exemption is None:
-            gst_exemption = df_inw.iloc[0].get('gst_exemption', False)
-
-        # GCN setup
-        current = d.datetime.now()
-        fin_year = int(get_object_or_404(GstRates, id=1).fin_year)
-        if fin_year < current.year and current.month > 3:
-            fin_year = current.year
-            GstRates.objects.filter(id=1).update(fin_year=fin_year, last_gcn_no=0)
-
-        gcn_no = get_object_or_404(GstRates, id=1).last_gcn_no
-        new_gcn_no = gcn_no + 1
-        fyear = str(fin_year + 1)[2:]
-        gcn_num = f"{str(new_gcn_no).zfill(3)}/{str(fin_year)}-{fyear}"
-        date = current.strftime('%Y-%m-%d')
-
-        df_inw["cust_id"] = cust_id
-        df_inw["gcn_no"] = gcn_num
-        df_inw["gcn_date"] = date
-        if new_cons_id:
-            df_inw["consignee_id"] = new_cons_id
-
-        qty_dict = dict(zip(po_sl_numbers, qty_tobe_del))
-        hsn_dict = dict(zip(po_sl_numbers, hsn))
-        df_inw['qty_tobe_del'] = df_inw['po_sl_no'].map(qty_dict)
-        df_inw['hsn'] = df_inw['po_sl_no'].map(hsn_dict)
-
-        # Add charge rows
-        def add_charge_row(code, desc, value, hsn_code):
-            return {
-                'slno': None, 'pono': po_no, 'podate': None, 'quote_id': '', 'quote_date': None,
-                'cust_id': cust_id, 'consignee_id': new_cons_id if new_cons_id else cust_id,
-                'po_sl_no': code, 'prod_code': '', 'prod_desc': desc, 'additional_desc': '',
-                'pack_size': '', 'quantity': 1, 'unit_price': value, 'uom': 'No', 'hsn_sac': hsn_code,
-                'total_price': value, 'qty_balance': 1, 'qty_sent': 1, 'delivery_date': None,
-                'po_validity': None, 'gst_exemption': '', 'gcn_no': gcn_num, 'gcn_date': date,
-                'location': df_inw.iloc[0].get('location', ''), 'qty_tobe_del': 1, 'hsn': hsn_code
-            }
-
-        charges = [("fr", "Packing forwarding with Freight charges", freight_charges, "9965"),
-                   ("ins", "Insurance Charges", insurance_charges, "9971"),
-                   ("oc", "Other Charges - " + other_charges.get("key", "") if other_charges.get("key") else "Other Charges",
-                    other_charges.get("value", 0), "9971")]
-
-        for code, desc, value, hsn_code in charges:
-            if value:
-                df_inw.loc[len(df_inw)] = add_charge_row(code, desc, value, hsn_code)
-                po_sl_numbers.append(code)
-                qty_tobe_del.append(1)
-                hsn.append(hsn_code)
-                noOfBatches.append(1)
-                batch_coc_quant[code] = {"batch": [""], "coc": [""], "quantity": [1]}
+            # Fetch DB rows
+            data_inw = CustomerPurchaseOrder.objects.filter(pono=po_no, po_sl_no__in=po_sl_numbers)
+            df_inw = pd.DataFrame(list(data_inw.values()))
         
-        # return JsonResponse({"df_inw": df_inw.to_dict(orient='records')})
+            if df_inw.empty:
+                return JsonResponse({"error": "No matching records in the database"}, status=404)
 
-        # GST calculation
-        gst = GstRates.objects.first()
-        cgst_r, sgst_r, igst_r = float(gst.cgst_rate)/100, float(gst.sgst_rate)/100, float(gst.igst_rate)/100
-        state_code = CustomerMaster.objects.filter(cust_id=cust_id).values_list('cust_st_code', flat=True).first()
-        df_inw["taxable_amt"] = (df_inw["qty_tobe_del"].astype(float) * df_inw["unit_price"].astype(float)).round(2)
+            # Append kit rows
+            # if extra_rows:
+            #     df_inw = pd.concat([df_inw, pd.DataFrame(extra_rows)], ignore_index=True)
 
-        if gst_exemption:
-            df_inw["cgst_price"], df_inw["sgst_price"], df_inw["igst_price"] = 0.0, 0.0, 0.0
-        else:
-            if int(state_code) == 29:
-                df_inw["cgst_price"] = (cgst_r * df_inw["taxable_amt"]).round(2)
-                df_inw["sgst_price"] = (sgst_r * df_inw["taxable_amt"]).round(2)
-                df_inw["igst_price"] = 0.0
+            # GST exemption fallback
+            if gst_exemption is None:
+                gst_exemption = df_inw.iloc[0].get('gst_exemption', False)
+
+            # GCN setup
+            current = d.datetime.now()
+            fin_year = int(get_object_or_404(GstRates, id=1).fin_year)
+            if fin_year < current.year and current.month > 3:
+                fin_year = current.year
+                GstRates.objects.filter(id=1).update(fin_year=fin_year, last_gcn_no=0)
+
+            gcn_no = get_object_or_404(GstRates, id=1).last_gcn_no
+            new_gcn_no = gcn_no + 1
+            fyear = str(fin_year + 1)[2:]
+            gcn_num = f"{str(new_gcn_no).zfill(3)}/{str(fin_year)}-{fyear}"
+            date = current.strftime('%Y-%m-%d')
+
+            df_inw["cust_id"] = cust_id
+            df_inw["gcn_no"] = gcn_num
+            df_inw["gcn_date"] = date
+            if new_cons_id:
+                df_inw["consignee_id"] = new_cons_id
+
+            qty_dict = dict(zip(po_sl_numbers, qty_tobe_del))
+            hsn_dict = dict(zip(po_sl_numbers, hsn))
+            df_inw['qty_tobe_del'] = df_inw['po_sl_no'].map(qty_dict)
+            df_inw['hsn'] = df_inw['po_sl_no'].map(hsn_dict)
+
+            # Add charge rows
+            def add_charge_row(code, desc, value, hsn_code):
+                return {
+                    'slno': None, 'pono': po_no, 'podate': None, 'quote_id': '', 'quote_date': None,
+                    'cust_id': cust_id, 'consignee_id': new_cons_id if new_cons_id else cust_id,
+                    'po_sl_no': code, 'prod_code': '', 'prod_desc': desc, 'additional_desc': '',
+                    'pack_size': '', 'quantity': 1, 'unit_price': value, 'uom': 'No', 'hsn_sac': hsn_code,
+                    'total_price': value, 'qty_balance': 1, 'qty_sent': 1, 'delivery_date': None,
+                    'po_validity': None, 'gst_exemption': '', 'gcn_no': gcn_num, 'gcn_date': date,
+                    'location': df_inw.iloc[0].get('location', ''), 'qty_tobe_del': 1, 'hsn': hsn_code
+                }
+
+            charges = [
+                ("fr", "Packing forwarding with Freight charges", safe_float(freight_charges, 0), "9965"),
+                ("ins", "Insurance Charges", safe_float(insurance_charges, 0), "9971"),
+                ("oc",
+                "Other Charges - " + other_charges.get("key", "") if other_charges.get("key") else "Other Charges",
+                safe_float(other_charges.get("value", 0), 0), "9971")
+            ]
+
+
+            for code, desc, value, hsn_code in charges:
+                if value:
+                    df_inw.loc[len(df_inw)] = add_charge_row(code, desc, value, hsn_code)
+                    po_sl_numbers.append(code)
+                    qty_tobe_del.append(1)
+                    hsn.append(hsn_code)
+                    noOfBatches.append(1)
+                    batch_coc_quant[code] = {"batch": [""], "coc": [""], "quantity": [1]}
+            
+            # return JsonResponse({"df_inw": df_inw.to_dict(orient='records')})
+
+            # GST calculation
+            gst = GstRates.objects.first()
+            cgst_r, sgst_r, igst_r = float(gst.cgst_rate)/100, float(gst.sgst_rate)/100, float(gst.igst_rate)/100
+            state_code = CustomerMaster.objects.filter(cust_id=cust_id).values_list('cust_st_code', flat=True).first()
+            df_inw["taxable_amt"] = (df_inw["qty_tobe_del"].astype(float) * df_inw["unit_price"].astype(float)).round(2)
+
+            if gst_exemption:
+                df_inw["cgst_price"], df_inw["sgst_price"], df_inw["igst_price"] = 0.0, 0.0, 0.0
             else:
-                df_inw["cgst_price"], df_inw["sgst_price"] = 0.0, 0.0
-                df_inw["igst_price"] = (igst_r * df_inw["taxable_amt"]).round(2)
+                if int(state_code) == 29:
+                    df_inw["cgst_price"] = (cgst_r * df_inw["taxable_amt"]).round(2)
+                    df_inw["sgst_price"] = (sgst_r * df_inw["taxable_amt"]).round(2)
+                    df_inw["igst_price"] = 0.0
+                else:
+                    df_inw["cgst_price"], df_inw["sgst_price"] = 0.0, 0.0
+                    df_inw["igst_price"] = (igst_r * df_inw["taxable_amt"]).round(2)
 
-        # return JsonResponse({"data_inw": list(data_inw.values()), "batch_coc_quant": batch_coc_quant, "noOfBatches": noOfBatches})
+            # return JsonResponse({"data_inw": list(data_inw.values()), "batch_coc_quant": batch_coc_quant, "noOfBatches": noOfBatches})
 
-        # Batch expansion
-        def create_new_df(df, batch_coc_quant, noOfBatches):
-            new_rows = []
-            slno_first = df.to_dict()['slno'][0] if 'slno' in df.columns and not df.empty else 1
-            for idx, row in df.iterrows():
-                n_batches = int(noOfBatches[idx]) if pd.notna(noOfBatches[idx]) else 1
-                for i in range(n_batches):
-                    new_row = row.copy()
-                    new_row['slno'] = slno_first
-                    new_row['batch_quantity'] = batch_coc_quant[row['po_sl_no']]['quantity'][i]
-                    new_row['batch_no'] = batch_coc_quant[row['po_sl_no']]['batch'][i]
-                    new_row['coc'] = batch_coc_quant[row['po_sl_no']]['coc'][i]
-                    new_rows.append(new_row)
-                    slno_first += 1
-                    print("idx: ", idx)
-                    print("row: ", new_row)
-                print("next_item")
-            print("new_rows: ", new_rows)
-            return pd.DataFrame(new_rows).reset_index(drop=True)
+            # Batch expansion
+            def create_new_df(df, batch_coc_quant, noOfBatches):
+                new_rows = []
+                slno_first = df.to_dict()['slno'][0] if 'slno' in df.columns and not df.empty else 1
+                for idx, row in df.iterrows():
+                    n_batches = int(noOfBatches[idx]) if pd.notna(noOfBatches[idx]) else 1
+                    for i in range(n_batches):
+                        new_row = row.copy()
+                        new_row['slno'] = slno_first
+                        new_row['batch_quantity'] = batch_coc_quant[row['po_sl_no']]['quantity'][i]
+                        new_row['batch_no'] = batch_coc_quant[row['po_sl_no']]['batch'][i]
+                        new_row['coc'] = batch_coc_quant[row['po_sl_no']]['coc'][i]
+                        new_rows.append(new_row)
+                        slno_first += 1
+                        print("idx: ", idx)
+                        print("row: ", new_row)
+                    print("next_item")
+                print("new_rows: ", new_rows)
+                return pd.DataFrame(new_rows).reset_index(drop=True)
 
-        new_df_dict = create_new_df(df_inw, batch_coc_quant, noOfBatches)
+            new_df_dict = create_new_df(df_inw, batch_coc_quant, noOfBatches)
+            # return JsonResponse({"new_df_dict": new_df_dict.to_dict(orient='records')})
+            # Save to OtwDc and update CustomerPurchaseOrder
+            
+            charge_po_sl_numbers = []
+            if safe_float(freight_charges, 0):
+                charge_po_sl_numbers.append("fr")
+            if safe_float(insurance_charges, 0):
+                charge_po_sl_numbers.append("ins")
+            if safe_float(other_charges.get("value", 0), 0):
+                charge_po_sl_numbers.append("oc")
 
-        # Save to OtwDc and update CustomerPurchaseOrder
-        skip_index = [len(new_df_dict)-i for i in range(1, 4) if charges[i-1][2]]  # Skip charge rows
-        for index, row in new_df_dict.iterrows():
-            max_slno = OtwDc.objects.aggregate(Max('sl_no'))['sl_no__max'] or 0
-            new_slno = max_slno + 1
-            cust_instance = CustomerMaster.objects.get(cust_id=row['cust_id'])
-            OtwDc_instance = OtwDc(
-                sl_no=new_slno, gcn_no=row['gcn_no'], gcn_date=row['gcn_date'], po_no=row['pono'],
-                po_date=row['podate'], consignee_id=row['consignee_id'], po_sl_no=row['po_sl_no'],
-                prod_id=row['prod_code'], prod_desc=row['prod_desc'], additional_desc=row['additional_desc'],
-                qty_delivered=row['qty_tobe_del'], pack_size=row['pack_size'], unit_price=row['unit_price'],
-                taxable_amt=row['taxable_amt'], cgst_price=row['cgst_price'], sgst_price=row['sgst_price'],
-                igst_price=row['igst_price'], cust=cust_instance, hsn_sac=row['hsn'], batch=row['batch_no'],
-                coc=row['coc'], batch_quantity=row['batch_quantity'], contact_name=contact_name, contact_number=contact
-            )
-            OtwDc_instance.save()
+            # Group updates by po_sl_no to handle batch quantities correctly
+            po_updates = defaultdict(Decimal)
+            for index, row in new_df_dict.iterrows():
+                if row['po_sl_no'] not in charge_po_sl_numbers:
+                    po_updates[row['po_sl_no']] += safe_decimal(row['batch_quantity'])
 
-            if index not in skip_index:
-                try:
-                    record = CustomerPurchaseOrder.objects.get(
-                        cust_id=row['cust_id'], 
-                        pono=row['pono'], 
-                        po_sl_no=row['po_sl_no']
-                    )
+            def validate_quantities_before_update():
+                """Pre-validate all quantities to ensure sufficient balance exists"""
+                
+                # Group batch quantities by po_sl_no (since batches split the total)
+                po_quantities = defaultdict(Decimal)
+                validation_errors = []
+                
+                # Calculate total requested quantity per po_sl_no
+                for index, row in new_df_dict.iterrows():
+                    if row['po_sl_no'] not in charge_po_sl_numbers:
+                        po_quantities[row['po_sl_no']] += safe_decimal(row['batch_quantity'])
+                
+                # Validate each po_sl_no against available balance
+                for po_sl_no, total_requested in po_quantities.items():
+                    try:
+                        record = CustomerPurchaseOrder.objects.get(
+                            cust_id=cust_id, 
+                            pono=po_no, 
+                            po_sl_no=po_sl_no
+                        )
+                        
+                        current_balance = record.qty_balance or Decimal("0")
+                        
+                        if current_balance < total_requested:
+                            validation_errors.append({
+                                "po_sl_no": po_sl_no,
+                                "available": str(current_balance),
+                                "requested": str(total_requested),
+                                "shortfall": str(total_requested - current_balance)
+                            })
+                            
+                    except ObjectDoesNotExist:
+                        validation_errors.append({
+                            "po_sl_no": po_sl_no,
+                            "error": "Purchase Order record does not exist",
+                            "requested": str(total_requested)
+                        })
+                
+                return validation_errors
 
-                    batch_quantity = Decimal(str(row['batch_quantity']))
+            # Call validation function
+            validation_errors = validate_quantities_before_update()
 
-                    record.qty_balance = (record.qty_balance or Decimal("0")) - batch_quantity
-                    record.qty_sent = (record.qty_sent or Decimal("0")) + batch_quantity
-                    record.save()
-                except ObjectDoesNotExist:
-                    return JsonResponse({
-                        "error": f"Record with cust_id={row['cust_id']}, po_sl_no={row['po_sl_no']} does not exist."
-                    }, status=404)
+            if validation_errors:
+                error_message = "Quantity validation failed. Insufficient balance for the following items:"
+                return JsonResponse({
+                    "error": error_message,
+                    "validation_details": validation_errors,
+                    "total_errors": len(validation_errors)
+                }, status=400)
 
-        GstRates.objects.filter(id=1).update(last_gcn_no=new_gcn_no)
-        return JsonResponse({"success": True, "gcn_no": new_gcn_no})
+            # Save to OtwDc and update CustomerPurchaseOrder
+            for index, row in new_df_dict.iterrows():
+                # Save to OtwDc (always save all rows)
+                max_slno = OtwDc.objects.aggregate(Max('sl_no'))['sl_no__max'] or 0
+                new_slno = max_slno + 1
+                cust_instance = CustomerMaster.objects.get(cust_id=row['cust_id'])
+                OtwDc_instance = OtwDc(
+                    sl_no=new_slno, gcn_no=row['gcn_no'], gcn_date=row['gcn_date'], po_no=row['pono'],
+                    po_date=row['podate'], consignee_id=row['consignee_id'], po_sl_no=row['po_sl_no'],
+                    prod_id=row['prod_code'], prod_desc=row['prod_desc'], additional_desc=row['additional_desc'],
+                    qty_delivered=row['qty_tobe_del'], pack_size=row['pack_size'], unit_price=row['unit_price'],
+                    taxable_amt=row['taxable_amt'], cgst_price=row['cgst_price'], sgst_price=row['sgst_price'],
+                    igst_price=row['igst_price'], cust=cust_instance, hsn_sac=row['hsn'], batch=row['batch_no'],
+                    coc=row['coc'], batch_quantity=row['batch_quantity'], contact_name=contact_name, contact_number=contact
+                )
+                OtwDc_instance.save()
+
+            # Update CustomerPurchaseOrder (only once per po_sl_no with total quantity)
+            updated_po_sl_numbers = set()
+            for index, row in new_df_dict.iterrows():
+                po_sl_no = row['po_sl_no']
+                
+                # Skip charge rows and already updated po_sl_numbers
+                if po_sl_no not in charge_po_sl_numbers and po_sl_no not in updated_po_sl_numbers:
+                    try:
+                        record = CustomerPurchaseOrder.objects.get(
+                            cust_id=row['cust_id'], 
+                            pono=row['pono'], 
+                            po_sl_no=po_sl_no
+                        )
+                        
+                        total_quantity_to_deduct = po_updates[po_sl_no]
+                        
+                        # Double-check balance one more time (redundant but safe)
+                        current_balance = record.qty_balance or Decimal("0")
+                        if current_balance < total_quantity_to_deduct:
+                            return JsonResponse({
+                                "error": f"Critical error: Insufficient balance for {po_sl_no}. "
+                                        f"Available: {current_balance}, Requested: {total_quantity_to_deduct}"
+                            }, status=500)
+                        
+                        # Update the record
+                        record.qty_balance = current_balance - total_quantity_to_deduct
+                        record.qty_sent = (record.qty_sent or Decimal("0")) + total_quantity_to_deduct
+                        record.save()
+                        
+                        updated_po_sl_numbers.add(po_sl_no)
+                        
+                    except ObjectDoesNotExist:
+                        return JsonResponse({
+                            "error": f"Critical error: Record with po_sl_no={po_sl_no} does not exist."
+                        }, status=500)
+
+            GstRates.objects.filter(id=1).update(last_gcn_no=new_gcn_no)
+            return JsonResponse({"success": True, "gcn_no": new_gcn_no})
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -1186,6 +1314,12 @@ def invoice_generation(request):
 
             # Calculate total number of packs instead of total quantity
             total_number_of_packs = sum(float(item.get('number_of_packs', 0) or 0) for item in final_otwdc)
+
+            total_quantity = sum(
+                float(item.get('qty_delivered', 0) or 0)
+                for item in inv_result
+                if str(item.get('po_sl_no')) not in unwanted_po_sl_no
+            )
             
             # Convert all monetary values to float for proper calculation
             total_taxable_value = sum(safe_float_conversion(item.get('taxable_amt', 0)) for item in inv_result)
@@ -1210,7 +1344,7 @@ def invoice_generation(request):
                 'total_sgst': "{:.2f}".format(total_sgst),
                 'total_igst': "{:.2f}".format(total_igst),
                 'gt': gt,
-                'total_qty': total_number_of_packs  # Use total number of packs instead of total quantity
+                'total_qty': total_quantity
             }
             
             # Debug: Print the first item to see if number_of_packs is included

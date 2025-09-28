@@ -66,6 +66,10 @@ export default function ProductDetails({
   const [popup, setPopup] = useState(false)
   const [kitQuantity, setKitQuantity] = useState("")
 
+  const isKitComponent =
+    formData[index].poSlNo && formData[index].poSlNo.includes(".")
+  const isMainKit = formData[index].prodId?.startsWith("KIT") && !isKitComponent
+
   const onSubProductDateChange = (date, index, dateStr) => {
     const parsedPoDate = parse(formData.poDate, "dd-MM-yyyy", new Date())
     const formattedPoDate = format(parsedPoDate, "dd-MM-yyyy")
@@ -298,8 +302,36 @@ export default function ProductDetails({
   }
 
   const checkKit = isKit[index]
-  const isKitComponent =
-    formData[index].poSlNo && formData[index].poSlNo.includes(".")
+
+  const handlePackSizeChange = (e) => {
+    const { value: newUom } = e.target
+    // Ensure we have a parsed packSize to derive quantity
+    if (!qtyUom || !qtyUom.qty) {
+      toast.error("Please select a product first to derive Pack Size")
+      return
+    }
+    // Build the new packSize string from stored qty and newly selected UOM
+    const newPackSize = `${qtyUom.qty} ${newUom}`
+
+    // Update local qtyUom state
+    setQtyUom((prev) => ({
+      ...prev,
+      u_o_m: newUom,
+    }))
+
+    // Update the formData for this line item
+    setFormData((prevFormData) =>
+      prevFormData.map((item, idx) =>
+        idx === index
+          ? {
+              ...item,
+              packSize: newPackSize,
+              uom: newUom,
+            }
+          : item
+      )
+    )
+  }
 
   return (
     <>
@@ -336,18 +368,37 @@ export default function ProductDetails({
               <div className="error-message">{errors.prodId}</div>
             )}
           </div>
-          <div>
-            <input
-              type="text"
-              name="packSize"
-              value={formData[index].packSize}
-              onChange={(e) => handleChange(index, e)}
-              onBlur={(e) => handlePkszChange(index, e)}
-              placeholder=" "
-              //readOnly
-            />
-            <label alt="Enter the Pack Size" placeholder="Pack Size"></label>
-          </div>
+          {isMainKit ? (
+            <div className="input-container">
+              <select
+                name="uom"
+                value={formData[index].uom}
+                onChange={handlePackSizeChange}
+                required
+              >
+                <option value="" disabled>
+                  Select an option
+                </option>
+                <option value="Ltr">Ltr</option>
+                <option value="Kg">Kg</option>
+                <option value="No.">No.</option>
+              </select>
+              <label alt="Select an Option" placeholder="UOM"></label>
+            </div>
+          ) : (
+            <div>
+              <input
+                type="text"
+                name="packSize"
+                value={formData[index].packSize}
+                onChange={(e) => handleChange(index, e)}
+                onBlur={(e) => handlePkszChange(index, e)}
+                placeholder=" "
+                //readOnly
+              />
+              <label alt="Enter the Pack Size" placeholder="Pack Size"></label>
+            </div>
+          )}
           <div className="grid-item-textarea">
             <textarea
               name="productDesc"
@@ -451,15 +502,17 @@ export default function ProductDetails({
           )}
 
           {/* Show UOM for all products */}
-          <div>
-            <input
-              type="text"
-              name="uom"
-              value={formData[index].uom}
-              placeholder=" "
-            />
-            <label alt="Enter the UoM" placeholder="UOM"></label>
-          </div>
+          {!isMainKit && (
+            <div>
+              <input
+                type="text"
+                name="uom"
+                value={formData[index].uom}
+                placeholder=" "
+              />
+              <label alt="Enter the UoM" placeholder="UOM"></label>
+            </div>
+          )}
 
           {/* Show delivery date only for non-kit components */}
           {checkKit && !isKitComponent ? (

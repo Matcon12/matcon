@@ -269,7 +269,7 @@ export default function AddCustomerDetails() {
             <div>
               <input
                 type="text"
-                required={true}
+                // required={true}
                 name="Cust_GST_ID"
                 value={formData.Cust_GST_ID}
                 onChange={handleChange}

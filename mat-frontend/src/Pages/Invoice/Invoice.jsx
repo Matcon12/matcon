@@ -163,200 +163,78 @@ export default function Invoice() {
 
     try {
       // Validate kit component quantities
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]
-        if (entry.isKit && entry.kitData && entry.kitData.length > 0) {
-          for (let j = 0; j < entry.kitData.length; j++) {
-            const kitItem = entry.kitData[j]
-            if (!kitItem.quantity || kitItem.quantity <= 0) {
-              toast.error(
-                `Please enter quantity for kit component: ${kitItem.prod_desc}`
-              )
-              return
-            }
-          }
-        }
-      }
-
+      console.log("Entries before submission:", entries)
       const transformedEntries = entries.map((entry) => {
-        // For kit products, we don't validate the main product quantity
-        // since quantities are entered for individual kit components
-        if (entry.isKit) {
-          // Validate kit quantity
-          const kitQuantity = Number(entry.kitQuantity || 0)
-          if (kitQuantity <= 0) {
-            throw new Error(
-              `Please enter a valid quantity for kit product ${
-                entry.prod_desc || entry.poSlNo
-              }.`
-            )
-          }
-
-          const kitComponentActuals = Array.isArray(entry.kitData)
-            ? entry.kitData.map((kitItem) => {
-                const entered = parseFloat(kitItem.quantity) || 0
-                const pack_size_raw = kitItem.pack_size || "1"
-                const pack_size_match = pack_size_raw
-                  .toString()
-                  .match(/(\d+(?:\.\d+)?)/)
-                const pack_size = pack_size_match
-                  ? parseFloat(pack_size_match[1])
-                  : 1.0
-                return entered
-              })
-            : []
-
-          const kitComponentSum = kitComponentActuals.reduce(
-            (sum, v) => sum + v,
-            0
-          )
-
-          // kitComponents (for API)
-          const kitComponents = entry.kitData.map((kitItem, idx) => {
-            const entered = parseFloat(kitItem.quantity) || 0
-            const pack_size_raw = kitItem.pack_size || "1"
-            const pack_size_match = pack_size_raw
-              .toString()
-              .match(/(\d+(?:\.\d+)?)/)
-            const pack_size = pack_size_match
-              ? parseFloat(pack_size_match[1])
-              : 1.0
-            const actual_quantity = entered
-            return {
-              po_sl_no: kitItem.po_sl_no,
-              prod_desc: kitItem.prod_desc,
-              hsnSac: kitItem.hsnSac || "",
-              unit_price: kitItem.unit_price,
-              quantity: actual_quantity,
-            }
-          })
-
-          // The main kit product object:
-          const baseEntry = {
+        if (entry.isKit && entry.kitData && entry.kitData.length > 0) {
+          // Kit product - only include specific fields
+          return {
             poSlNo: entry.poSlNo,
-            hsnSac: entry.hsnSac,
-            quantities: kitComponentSum,
+            quantities: entry.kitQuantity,
+            hsnSac: entry.hsnSac || "",
+            isKitProduct: true,
+            kitComponents: entry.kitData.map((kitComp) => ({
+              po_sl_no: kitComp.po_sl_no,
+              prod_code: kitComp.prod_code,
+              prod_desc: kitComp.prod_desc,
+              quantity: kitComp.quantity || "",
+              uom: kitComp.uom,
+              hsnSac: kitComp.hsnSac || "",
+              noOfBatches: kitComp.noOfBatches,
+              batch: kitComp.batches
+                ? kitComp.batches.map((b) => b.batchNo)
+                : [],
+              coc: kitComp.batches
+                ? kitComp.batches.map((b) => b.coc || "")
+                : [],
+              quantity_list: kitComp.batches
+                ? kitComp.batches.map((b) => b.quantity.toString())
+                : [],
+            })),
+          }
+        } else {
+          // Regular product - exclude quantities field, only include batch_coc_quant
+          const totalQuantity = entry.quantities
+            ? entry.quantities.reduce((sum, q) => sum + Number(q), 0).toString()
+            : "0"
+          return {
+            poSlNo: entry.poSlNo,
+            hsnSac: entry.hsnSac || "",
+            quantities: totalQuantity,
             noOfBatches: entry.noOfBatches,
             batch_coc_quant: {
-              batch: entry.batches,
-              coc: entry.cocs,
-              quantity: [kitComponentSum.toString()],
+              batch: entry.batches
+                ? entry.batches.map((b) =>
+                    typeof b === "object" ? b.batchNo : b
+                  )
+                : [],
+              coc: entry.cocs ? entry.cocs.map((c) => c || "") : [],
+              quantity: entry.quantities
+                ? entry.quantities.map((q) => q.toString())
+                : [],
             },
-            kitComponents: kitComponents,
-            isKitProduct: true,
           }
-
-          // Add kit component data if this is a kit product
-          if (entry.kitData && entry.kitData.length > 0) {
-            baseEntry.kitComponents = entry.kitData.map((kitItem) => {
-              // For kit components, calculate actual quantity as number_of_packs * pack_size
-              const number_of_packs = parseFloat(kitItem.quantity) || 0
-              const pack_size_raw = kitItem.pack_size || "1"
-
-              // Extract numeric value from pack_size
-              const pack_size_match = pack_size_raw
-                .toString()
-                .match(/(\d+(?:\.\d+)?)/)
-              const pack_size = pack_size_match
-                ? parseFloat(pack_size_match[1])
-                : 1.0
-
-              // Calculate actual quantity for kit components
-              const actual_quantity = number_of_packs * pack_size
-
-              console.log(
-                `Kit component ${kitItem.po_sl_no}: number_of_packs=${number_of_packs}, pack_size=${pack_size}, actual_quantity=${actual_quantity}`
-              )
-
-              return {
-                po_sl_no: kitItem.po_sl_no,
-                prod_desc: kitItem.prod_desc,
-                hsnSac: kitItem.hsnSac || "",
-                unit_price: kitItem.unit_price,
-                quantity: number_of_packs, // Send actual quantity (number_of_packs * pack_size)
-              }
-            })
-
-            // For kit products, we don't need batch data since components are handled separately
-            baseEntry.isKitProduct = true
-          }
-
-          return baseEntry
         }
-
-        // For non-kit products, validate quantities as before
-        const validQuantities = entry.quantities
-          .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
-          .map((qty) => Number(qty))
-          .filter((qty) => !isNaN(qty) && qty > 0)
-
-        const validActualQuantities = entry.quantities
-          .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
-          .map(
-            (qty) => (parseFloat(qty) || 0) * (parseFloat(entry.pack_size) || 1)
-          )
-          .filter((qty) => !isNaN(qty) && qty > 0)
-
-        const quantitiesSum = validQuantities.reduce(
-          (sum, quantity) => sum + quantity,
-          0
-        )
-
-        console.log("Entry quantities:", entry.quantities)
-        console.log("Valid quantities:", validQuantities)
-        console.log("Quantities sum:", quantitiesSum)
-
-        if (quantitiesSum <= 0) {
-          throw new Error(
-            `Invalid quantity for product ${
-              entry.prod_desc || entry.poSlNo
-            }. Please enter valid quantities.`
-          )
-        }
-
-        const baseEntry = {
-          poSlNo: entry.poSlNo,
-          hsnSac: entry.hsnSac,
-          quantities: quantitiesSum,
-          noOfBatches: entry.noOfBatches,
-          batch_coc_quant: {
-            batch: entry.batches,
-            coc: entry.cocs,
-            quantity: entry.quantities.map((qty, idx) => {
-              const packSize = parseFloat(entry.pack_size) || 1
-              return (parseFloat(qty) || 0).toString()
-            }),
-          },
-        }
-
-        return baseEntry
       })
 
+      // Create the payload in the exact structure you specified, including location
       const formData2 = {
-        customerId: formData.customerId,
         consigneeName: formData.consigneeId,
-        newConsigneeName: formData.newConsigneeId,
         contactName: formData.contactName,
-        location: formData.location,
-        poNo: formData.poNo,
-        items: transformedEntries,
+        customerId: formData.customerId,
         freightCharges: formData.freightCharges,
         insuranceCharges: formData.insuranceCharges,
+        location: formData.location,
+        newConsigneeName: formData.newConsigneeId,
         otherCharges: formData.otherCharges,
+        poNo: formData.poNo,
+        items: transformedEntries,
       }
 
       console.log("Submitting form data:", { formData2 })
       console.log("Entries:", entries)
       console.log("Transformed entries:", transformedEntries)
-      console.log("Location value being sent:", formData.location)
       console.log("Complete formData state:", formData)
-      console.log("formData2 location field:", formData2.location)
-      console.log("Complete payload structure:", {
-        formData2: {
-          ...formData2,
-          location: formData.location,
-        },
-      })
+
       const payload = {
         formData2,
       }
@@ -365,17 +243,8 @@ export default function Invoice() {
         JSON.stringify(payload, null, 2)
       )
 
-      // Verify location is included in the payload
-      if (!payload.formData2.location) {
-        console.error("WARNING: Location field is missing from payload!")
-        console.error("formData.location:", formData.location)
-        console.error("formData2.location:", formData2.location)
-      } else {
-        console.log(
-          "✅ Location field is present in payload:",
-          payload.formData2.location
-        )
-      }
+      console.log("Sending payload to /invoiceProcessing:", payload)
+      // setIsSubmitting(false)
 
       api
         .post("/invoiceProcessing", payload, {
@@ -485,12 +354,18 @@ export default function Invoice() {
             const kitProductsWithUOM = kitProducts.map((kitProduct) => ({
               ...kitProduct,
               uom: kitProduct.uom || "units",
+              noOfBatches: 1,
+              batches: initializeKitBatches(1, kitProduct),
+              quantity: "",
             }))
+
             newEntries[entryIndex].kitData = kitProductsWithUOM
             newEntries[entryIndex].isKit = true
+            newEntries[entryIndex].kitQuantity = "0" // Initialize to 0
           } else {
             newEntries[entryIndex].isKit = false
             newEntries[entryIndex].kitData = []
+            newEntries[entryIndex].kitQuantity = "" // Clear if not a kit
           }
 
           console.log("Auto-populated fields:", {
@@ -585,63 +460,141 @@ export default function Invoice() {
     }
   }
 
-  const handleNonKitQuantityChange = (entryIndex, fieldIndex, value) => {
-    console.log("Non-kit quantity change:", {
-      entryIndex,
-      fieldIndex,
-      value,
-    })
-    const newEntries = [...entries]
+  // const handleNonKitQuantityChange = (entryIndex, fieldIndex, value) => {
+  //   console.log("Non-kit quantity change:", {
+  //     entryIndex,
+  //     fieldIndex,
+  //     value,
+  //   })
+  //   const newEntries = [...entries]
 
-    if (newEntries[entryIndex]) {
-      const entry = newEntries[entryIndex]
-      const quantity = parseFloat(value) || 0
-      const balance = parseFloat(entry.qty_balance) || 0
-      const packSize = parseFloat(entry.pack_size) || 1
+  //   if (newEntries[entryIndex]) {
+  //     const entry = newEntries[entryIndex]
+  //     const quantity = parseFloat(value) || 0
+  //     const balance = parseFloat(entry.qty_balance) || 0
+  //     const packSize = parseFloat(entry.pack_size) || 1
 
-      // Create a temporary copy to calculate total quantity across all batches
-      const tempQuantities = [...entry.quantities]
-      tempQuantities[fieldIndex] = value
+  //     // Create a temporary copy to calculate total quantity across all batches
+  //     const tempQuantities = [...entry.quantities]
+  //     tempQuantities[fieldIndex] = value
 
-      // Calculate total quantity across all batches
-      const totalQuantityAcrossAllBatches = tempQuantities
-        .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
-        .map((qty) => parseFloat(qty) || 0)
-        .reduce((sum, qty) => sum + qty, 0)
+  //     // Calculate total quantity across all batches
+  //     const totalQuantityAcrossAllBatches = tempQuantities
+  //       .filter((qty) => qty !== "" && qty !== null && qty !== undefined)
+  //       .map((qty) => parseFloat(qty) || 0)
+  //       .reduce((sum, qty) => sum + qty, 0)
 
-      // const totalActualQuantity = totalQuantityAcrossAllBatches * packSize
+  //     // const totalActualQuantity = totalQuantityAcrossAllBatches * packSize
 
-      // Validate against total balance
-      if (totalQuantityAcrossAllBatches > balance) {
-        const maxAllowedTotal = Math.floor(balance / packSize)
-        const currentTotalExcludingThis = tempQuantities
-          .filter(
-            (qty, idx) =>
-              idx !== fieldIndex &&
-              qty !== "" &&
-              qty !== null &&
-              qty !== undefined
-          )
-          .map((qty) => parseFloat(qty) || 0)
-          .reduce((sum, qty) => sum + qty, 0)
+  //     // Validate against total balance
+  //     if (totalQuantityAcrossAllBatches > balance) {
+  //       const maxAllowedTotal = Math.floor(balance / packSize)
+  //       const currentTotalExcludingThis = tempQuantities
+  //         .filter(
+  //           (qty, idx) =>
+  //             idx !== fieldIndex &&
+  //             qty !== "" &&
+  //             qty !== null &&
+  //             qty !== undefined
+  //         )
+  //         .map((qty) => parseFloat(qty) || 0)
+  //         .reduce((sum, qty) => sum + qty, 0)
 
-        const maxAllowedForThisField = Math.max(
-          0,
-          maxAllowedTotal - currentTotalExcludingThis
-        )
+  //       const maxAllowedForThisField = Math.max(
+  //         0,
+  //         maxAllowedTotal - currentTotalExcludingThis
+  //       )
 
-        toast.warning(
-          `Total quantity across all batches cannot exceed available balance. ` +
-            `You're trying to use ${totalQuantityAcrossAllBatches}, ` +
-            `but only ${balance} units are available. ` +
-            `Maximum allowed for this batch: ${maxAllowedForThisField} (${maxAllowedForThisField})`
-        )
-        return
-      }
+  //       toast.warning(
+  //         `Total quantity across all batches cannot exceed available balance. ` +
+  //           `You're trying to use ${totalQuantityAcrossAllBatches}, ` +
+  //           `but only ${balance} units are available. ` +
+  //           `Maximum allowed for this batch: ${maxAllowedForThisField} (${maxAllowedForThisField})`
+  //       )
+  //       return
+  //     }
 
-      newEntries[entryIndex].quantities[fieldIndex] = value
-      setEntries(newEntries)
+  //     newEntries[entryIndex].quantities[fieldIndex] = value
+  //     setEntries(newEntries)
+  //   }
+  // }
+
+  function handleNonKitQuantityChange(entryIndex, fieldIndex, value) {
+    setEntries((prev) =>
+      prev.map((entry, i) => {
+        if (i !== entryIndex) return entry
+        const newQuantities = [...entry.quantities]
+        newQuantities[fieldIndex] = value
+        return { ...entry, quantities: newQuantities }
+      })
+    )
+  }
+
+  // function handleNonKitQuantityChange(entryIndex, fieldIndex, value) {
+  //   setEntries((prev) =>
+  //     prev.map((entry, i) => {
+  //       if (i !== entryIndex) return entry
+  //       const newQuantities = [...entry.quantities]
+  //       newQuantities[fieldIndex] = value
+  //       return { ...entry, quantities: newQuantities }
+  //     })
+  //   )
+  // }
+
+  // On blur, validate pack-size multiple, positive, and total balance
+  function handleNonKitInputBlur(e, entryIndex, fieldIndex) {
+    const value = parseFloat(e.target.value)
+    const entry = entries[entryIndex]
+    console.log("Big entries:", entry)
+    const packSize = parseFloat(entry.pack_size) || 1
+    const balance = parseFloat(entry.qty_balance) || 0
+    console.log("packSize, balance:", packSize, balance)
+
+    // 1. Positive number
+    if (isNaN(value) || value <= 0) {
+      toast.error("Quantity must be a positive number")
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
     }
+
+    // 2. Pack-size multiple
+    if ((value * 1000) % (packSize * 1000) !== 0) {
+      toast.error(`Quantity must be a multiple of pack size ${packSize}`)
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 3. Total across all batches ≤ balance
+    const otherTotals = entry.quantities
+      .filter((_, idx) => idx !== fieldIndex)
+      .reduce((sum, qty) => sum + (parseFloat(qty) || 0), 0)
+    const totalAfter = otherTotals + value
+
+    if (totalAfter > balance) {
+      const maxForThis = Math.max(
+        0,
+        Math.floor(balance / packSize) - otherTotals
+      )
+      toast.error(
+        `Total quantity across all batches cannot exceed balance. Maximum for this batch: ${maxForThis}`
+      )
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 4. On success, format and mark as filled
+    const formatted = value.toFixed(2)
+    handleNonKitQuantityChange(entryIndex, fieldIndex, formatted)
+    e.target.classList.add("has-value")
   }
 
   const validateNonKitQuantityMultiple = (entryIndex, fieldIndex, value) => {
@@ -748,21 +701,21 @@ export default function Invoice() {
     }
   }
 
-  const handleNonKitInputBlur = (e, entryIndex, fieldIndex) => {
-    if (!e.target.value || e.target.value.trim() === "") {
-      e.target.classList.remove("has-value")
-    } else {
-      e.target.classList.add("has-value")
-      const entry = entries[entryIndex]
-      const quantity = parseFloat(e.target.value) || 0
-      const packSize = parseFloat(entry?.pack_size) || 1
-      if (packSize && Math.abs(quantity % packSize) != 0) {
-        toast.warning(
-          `Quantity must be a multiple of pack size (${packSize}). Entered: ${quantity}`
-        )
-      }
-    }
-  }
+  // const handleNonKitInputBlur = (e, entryIndex, fieldIndex) => {
+  //   if (!e.target.value || e.target.value.trim() === "") {
+  //     e.target.classList.remove("has-value")
+  //   } else {
+  //     e.target.classList.add("has-value")
+  //     const entry = entries[entryIndex]
+  //     const quantity = parseFloat(e.target.value) || 0
+  //     const packSize = parseFloat(entry?.pack_size) || 1
+  //     if (packSize && Math.abs(quantity % packSize) != 0) {
+  //       toast.warning(
+  //         `Quantity must be a multiple of pack size (${packSize}). Entered: ${quantity}`
+  //       )
+  //     }
+  //   }
+  // }
 
   const handleValidateKitInputBlur = (e, entryIndex, kitIndex) => {
     if (!e.target.value || e.target.value.trim() === "") {
@@ -894,6 +847,411 @@ export default function Invoice() {
     const remainingBalance = Math.max(0, totalBalance - totalQuantityUsed)
 
     return remainingBalance.toFixed(2)
+  }
+
+  // Updated helper functions for individual batch calculations
+
+  // Helper function to initialize batches array for kit components
+  const initializeKitBatches = (numBatches, kitItem) => {
+    const balance = parseFloat(kitItem.qty_balance) || 0
+    return Array.from({ length: numBatches }, () => ({
+      batchNo: "",
+      quantity: "",
+      packSize: kitItem.pack_size || 1,
+      balance: balance, // Each batch shows the original balance
+      remaining: balance, // Initially, remaining equals balance
+    }))
+  }
+
+  // Handle kit component batch field changes with individual batch calculations
+  // const handleKitBatchChange = (
+  //   entryIndex,
+  //   kitIndex,
+  //   batchIndex,
+  //   field,
+  //   value
+  // ) => {
+  //   setEntries((prev) => {
+  //     const updated = [...prev]
+  //     const kitItem = updated[entryIndex].kitData[kitIndex]
+
+  //     if (!kitItem.batches) {
+  //       kitItem.batches = initializeKitBatches(
+  //         kitItem.noOfBatches || 1,
+  //         kitItem
+  //       )
+  //     }
+
+  //     // Update the specific field
+  //     kitItem.batches[batchIndex] = {
+  //       ...kitItem.batches[batchIndex],
+  //       [field]: value,
+  //     }
+
+  //     // Recalculate remaining quantities for all batches when quantity changes
+  //     if (field === "quantity") {
+  //       const quantity = parseFloat(value) || 0
+  //       const originalBalance = parseFloat(kitItem.qty_balance) || 0
+
+  //       // Calculate total quantity used across all batches of this kit component
+  //       const totalUsedAcrossAllBatches = kitItem.batches.reduce(
+  //         (sum, batch) => {
+  //           return sum + (parseFloat(batch.quantity) || 0)
+  //         },
+  //         0
+  //       )
+
+  //       // Check if total exceeds balance
+  //       if (totalUsedAcrossAllBatches > originalBalance) {
+  //         toast.warning(
+  //           `Total quantity across all batches cannot exceed available balance (${originalBalance})`
+  //         )
+  //         return prev // Don't update if validation fails
+  //       }
+
+  //       // Update remaining for each batch individually
+  //       kitItem.batches.forEach((batch, idx) => {
+  //         const batchQuantity = parseFloat(batch.quantity) || 0
+
+  //         if (idx === batchIndex) {
+  //           // For the current batch being edited
+  //           batch.remaining = Math.max(
+  //             0,
+  //             originalBalance - totalUsedAcrossAllBatches
+  //           ).toFixed(2)
+  //         } else {
+  //           // For other batches, recalculate their remaining based on their individual usage
+  //           const otherBatchQuantity = parseFloat(batch.quantity) || 0
+  //           const remainingForThisBatch = Math.max(
+  //             0,
+  //             originalBalance - totalUsedAcrossAllBatches
+  //           ).toFixed(2)
+  //           batch.remaining = remainingForThisBatch
+  //         }
+  //       })
+
+  //       // Alternative approach: Show individual batch remaining as balance minus current batch quantity
+  //       // Uncomment this section if you want each batch to show remaining as balance - its own quantity
+  //       /*
+  //     kitItem.batches.forEach((batch, idx) => {
+  //       const batchQuantity = parseFloat(batch.quantity) || 0
+  //       batch.remaining = Math.max(0, originalBalance - batchQuantity).toFixed(2)
+  //     })
+  //     */
+
+  //       // Update main kit quantity (sum of all component quantities across all batches)
+  //       const mainKitQuantity = updated[entryIndex].kitData.reduce(
+  //         (sum, component) => {
+  //           if (component.batches) {
+  //             return (
+  //               sum +
+  //               component.batches.reduce((batchSum, batch) => {
+  //                 return batchSum + (parseFloat(batch.quantity) || 0)
+  //               }, 0)
+  //             )
+  //           }
+  //           return sum + (parseFloat(component.quantity) || 0)
+  //         },
+  //         0
+  //       )
+
+  //       updated[entryIndex].kitQuantity = mainKitQuantity.toString()
+  //     }
+
+  //     return updated
+  //   })
+  // }
+
+  const handleKitBatchChange = (
+    entryIndex,
+    kitIndex,
+    batchIndex,
+    field,
+    value
+  ) => {
+    setEntries((prev) => {
+      const updated = [...prev]
+      const kitItem = updated[entryIndex].kitData[kitIndex]
+      if (!kitItem.batches) {
+        kitItem.batches = initializeKitBatches(
+          kitItem.noOfBatches || 1,
+          kitItem
+        )
+      }
+      // Update specific batch field
+      kitItem.batches[batchIndex] = {
+        ...kitItem.batches[batchIndex],
+        [field]: value,
+      }
+      // Recalculate total quantity used across all batches
+      const totalUsed = kitItem.batches.reduce(
+        (sum, batch) => sum + (parseFloat(batch.quantity) || 0),
+        0
+      )
+      // Update remaining for each batch accordingly
+      kitItem.batches.forEach((batch) => {
+        batch.remaining = Math.max(
+          0,
+          parseFloat(kitItem.qtybalance || 0) - totalUsed
+        ).toFixed(2)
+      })
+      // Also update the mainKitQuantity for this entry from all components
+      const mainKitQuantity = updated[entryIndex].kitData.reduce(
+        (total, component) => {
+          if (component.batches)
+            return (
+              total +
+              component.batches.reduce(
+                (batchSum, batch) =>
+                  batchSum + (parseFloat(batch.quantity) || 0),
+                0
+              )
+            )
+          return total + (parseFloat(component.quantity) || 0)
+        },
+        0
+      )
+      updated[entryIndex].kitQuantity = mainKitQuantity.toString()
+      return updated
+    })
+  }
+
+  function handleKitBatchQuantityBlur(e, entryIndex, kitIndex, batchIndex) {
+    const value = parseFloat(e.target.value)
+    const batch = entries[entryIndex].kitData[kitIndex].batches[batchIndex]
+    const packSize = parseFloat(batch.packSize) || 1
+    const balance = parseFloat(batch.balance) || 0
+    const component = entries[entryIndex].kitData[kitIndex]
+    const componentBalance = parseFloat(component.qty_balance) || 0
+
+    console.log(
+      "value, batch, packSize, balance, component, componentBalance:",
+      {
+        value,
+        batch,
+        packSize,
+        balance,
+        component,
+        componentBalance,
+      }
+    )
+
+    // 1. Positive number
+    if (isNaN(value) || value <= 0) {
+      toast.error("Batch quantity must be a positive number")
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 2. Pack‐size multiple
+    if ((value * 1000) % (packSize * 1000) !== 0) {
+      toast.error(`Quantity must be a multiple of pack size ${packSize}`)
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 3. Individual batch ≤ its balance
+    if (value > balance) {
+      toast.error(
+        `Batch units (${
+          value * packSize
+        }) exceed this batch balance (${balance})`
+      )
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 4. Total across all batches for this component ≤ component balance
+    const otherTotal = component.batches
+      .filter((_, idx) => idx !== batchIndex)
+      .reduce((sum, b) => sum + (parseFloat(b.quantity) || 0), 0)
+    if (otherTotal + value > componentBalance) {
+      toast.error(
+        `Total across all batches (${
+          otherTotal + value
+        }) exceeds component balance (${componentBalance})`
+      )
+      setTimeout(() => {
+        e.target.focus()
+        e.target.select()
+      }, 100)
+      return
+    }
+
+    // 5. On success, format and mark filled
+    const formatted = value.toFixed(2)
+    handleKitBatchChange(
+      entryIndex,
+      kitIndex,
+      batchIndex,
+      "quantity",
+      formatted
+    )
+    e.target.classList.add("has-value")
+
+    // Force recalculation of kit quantity
+    setTimeout(() => {
+      setEntries((prev) =>
+        prev.map((entry, i) => {
+          if (i !== entryIndex) return entry
+
+          const calculatedKitQuantity = entry.kitData.reduce(
+            (total, component) => {
+              if (component.batches) {
+                const componentTotal = component.batches.reduce(
+                  (batchSum, batch) => {
+                    return batchSum + (parseFloat(batch.quantity) || 0)
+                  },
+                  0
+                )
+                return total + componentTotal
+              }
+              return total
+            },
+            0
+          )
+
+          return {
+            ...entry,
+            kitQuantity: calculatedKitQuantity.toString(),
+          }
+        })
+      )
+    }, 0)
+  }
+
+  // Alternative calculation method: Individual batch remaining calculation
+  const handleKitBatchChangeIndividual = (
+    entryIndex,
+    kitIndex,
+    batchIndex,
+    field,
+    value
+  ) => {
+    setEntries((prev) => {
+      const updated = [...prev]
+      const kitItem = updated[entryIndex].kitData[kitIndex]
+
+      if (!kitItem.batches) {
+        kitItem.batches = initializeKitBatches(
+          kitItem.noOfBatches || 1,
+          kitItem
+        )
+      }
+
+      // Update the specific field
+      kitItem.batches[batchIndex] = {
+        ...kitItem.batches[batchIndex],
+        [field]: value,
+      }
+
+      // Recalculate remaining for this specific batch only
+      if (field === "quantity") {
+        const quantity = parseFloat(value) || 0
+        const originalBalance = parseFloat(kitItem.qty_balance) || 0
+
+        // Validate individual batch quantity
+        if (quantity > originalBalance) {
+          toast.warning(
+            `Batch quantity cannot exceed available balance (${originalBalance})`
+          )
+          return prev // Don't update if validation fails
+        }
+
+        // Update remaining for this specific batch
+        kitItem.batches[batchIndex].remaining = Math.max(
+          0,
+          originalBalance - quantity
+        ).toFixed(2)
+
+        // Calculate total quantity used across all batches for validation
+        const totalUsedAcrossAllBatches = kitItem.batches.reduce(
+          (sum, batch) => {
+            return sum + (parseFloat(batch.quantity) || 0)
+          },
+          0
+        )
+
+        // Check if total exceeds balance and show warning
+        if (totalUsedAcrossAllBatches > originalBalance) {
+          toast.warning(
+            `Total quantity across all batches (${totalUsedAcrossAllBatches}) exceeds available balance (${originalBalance})`
+          )
+        }
+
+        // Update main kit quantity (sum of all component quantities across all batches)
+        const mainKitQuantity = updated[entryIndex].kitData.reduce(
+          (sum, component) => {
+            if (component.batches) {
+              return (
+                sum +
+                component.batches.reduce((batchSum, batch) => {
+                  return batchSum + (parseFloat(batch.quantity) || 0)
+                }, 0)
+              )
+            }
+            return sum + (parseFloat(component.quantity) || 0)
+          },
+          0
+        )
+
+        updated[entryIndex].kitQuantity = mainKitQuantity.toString()
+      }
+
+      return updated
+    })
+  }
+
+  // Handle kit component number of batches change with proper initialization
+  const handleKitComponentBatchCountChange = (entryIndex, kitIndex, value) => {
+    const numBatches = parseInt(value) || 1
+    setEntries((prev) => {
+      const updated = [...prev]
+      const kitItem = updated[entryIndex].kitData[kitIndex]
+
+      kitItem.noOfBatches = numBatches
+
+      // Preserve existing batch data when possible
+      const existingBatches = kitItem.batches || []
+      const newBatches = Array.from({ length: numBatches }, (_, index) => {
+        if (index < existingBatches.length) {
+          // Keep existing batch data
+          return {
+            ...existingBatches[index],
+            packSize: kitItem.pack_size || 1,
+            balance: parseFloat(kitItem.qty_balance) || 0,
+            // Recalculate remaining based on current quantity
+            remaining: Math.max(
+              0,
+              (parseFloat(kitItem.qty_balance) || 0) -
+                (parseFloat(existingBatches[index].quantity) || 0)
+            ).toFixed(2),
+          }
+        } else {
+          // Create new batch
+          return {
+            batchNo: "",
+            quantity: "",
+            packSize: kitItem.pack_size || 1,
+            balance: parseFloat(kitItem.qty_balance) || 0,
+            remaining: (parseFloat(kitItem.qty_balance) || 0).toFixed(2),
+          }
+        }
+      })
+
+      kitItem.batches = newBatches
+
+      return updated
+    })
   }
 
   return (
@@ -1055,6 +1413,7 @@ export default function Invoice() {
         <div>
           {show && (
             <div className="invoice-input-complete-container">
+              {console.log(entries)}
               {Array.isArray(entries) &&
                 entries.map((entry, entryIndex) => (
                   <div key={entryIndex} className="entry-container">
@@ -1100,14 +1459,44 @@ export default function Invoice() {
                               />
                             </div>
                             {entry.isKit && (
-                              <div className="kit-total-container">
-                                Total amount: ₹
-                                {/* {Number(entry.unit_price).toFixed(2)} ×{" "}
-                              {Number(entry.kitQuantity || 0)} = ₹ */}
-                                {(
-                                  Number(entry.unit_price) *
-                                  Number(entry.kitQuantity || 0)
-                                ).toFixed(2)}
+                              <div className="kit-total-container product-info">
+                                <div className="kit-component-info">
+                                  <span>
+                                    Unit Price: ₹
+                                    {Number(entry.unit_price || 0).toFixed(2)}
+                                  </span>
+                                  <span>
+                                    Total amount: ₹
+                                    {(
+                                      Number(entry.unit_price || 0) *
+                                      Number(entry.kitQuantity || 0)
+                                    ).toFixed(2)}
+                                  </span>
+                                  {/* <span>
+                                    Pack Size: {entry.pack_size || "N/A"}
+                                  </span> */}
+                                  <span
+                                    className={`kit-component-balance ${getStockLevelClass(
+                                      entry.qty_balance
+                                    )}`}
+                                  >
+                                    Available Balance:{" "}
+                                    {formatBalance(entry.qty_balance)}{" "}
+                                    {getUOMWithFallback(entry)}
+                                  </span>
+                                  <span className="total-balance-info">
+                                    Overall Remaining:{" "}
+                                    {(
+                                      Number(entry.qty_balance || 0) -
+                                      Number(entry.kitQuantity || 0)
+                                    ).toFixed(2)}{" "}
+                                    {getUOMWithFallback(entry)}
+                                    {/* (
+                                    Number(entry.qty_balance || 0) -
+                                    Number(entry.kitQuantity || 0)).toFixed(2){" "}
+                                    {getUOMWithFallback(entry)} */}
+                                  </span>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1149,45 +1538,35 @@ export default function Invoice() {
                               />
                               <label>HSN/SAC (Editable)</label>
                             </div>
-                            {/* Quantity field for kit products */}
                             {entry.isKit && (
-                              <>
-                                <div className="info-field">
-                                  <input
-                                    type="number"
-                                    name="kitQuantity"
-                                    value={entry.kitQuantity || ""}
-                                    onChange={(e) =>
-                                      handleChange(
-                                        entryIndex,
-                                        null,
-                                        "kitQuantity",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder=" "
-                                    min="1"
-                                    step="1"
-                                    onFocus={handleKitInputFocus}
-                                    onBlur={handleKitInputBlur}
-                                  />
-                                  <label>Kit Quantity</label>
-                                </div>
-                                {/* <span>
-                                  Total amount: ₹
-                                  {Number(entry.unit_price).toFixed(2)} ×{" "}
-                                  {Number(entry.kitQuantity || 0)}= ₹
-                                  {(
-                                    Number(entry.unit_price) *
-                                    Number(entry.kitQuantity || 0)
-                                  ).toFixed(2)}
-                                </span> */}
-                              </>
+                              <div className="info-field">
+                                <input
+                                  type="number"
+                                  name="kitQuantity"
+                                  value={entry.kitQuantity || ""}
+                                  onChange={(e) =>
+                                    handleChange(
+                                      entryIndex,
+                                      null,
+                                      "kitQuantity",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder=" "
+                                  min="1"
+                                  step="1"
+                                  onFocus={handleKitInputFocus}
+                                  onBlur={handleKitInputBlur}
+                                  readOnly
+                                />
+                                <label>Kit Quantity</label>
+                              </div>
                             )}
                           </div>
                         </div>
                       </div>
-                      {/* Non-Kit Product Components Section */}
+
+                      {/* Non Kit Product Components Section */}
                       {!(
                         entry.prod_code && entry.prod_code.startsWith("KIT")
                       ) && (
@@ -1233,9 +1612,6 @@ export default function Invoice() {
                                   </div>
                                   <div className="kit-component-details">
                                     <div className="kit-component-info">
-                                      {/* <span>Product: {entry.prod_desc}</span>
-                                      <span>HSN/SAC: {entry.hsnSac}</span>
-                                      <span>PO Sl No: {entry.poSlNo}</span> */}
                                       <span>
                                         Unit Price: ₹
                                         {Number(entry.unit_price).toFixed(2)}
@@ -1285,10 +1661,10 @@ export default function Invoice() {
                                           )}
                                       </span>
                                       <span className="total-balance-info">
-                                        Total Balance:{" "}
+                                        {/* Total Balance:{" "}
                                         {formatBalance(entry.qty_balance)}{" "}
-                                        {getUOMWithFallback(entry)}| Overall
-                                        Remaining:{" "}
+                                        {getUOMWithFallback(entry)} |  */}
+                                        Overall Remaining:{" "}
                                         {getCurrentRemainingBalance(
                                           entry,
                                           fieldIndex
@@ -1325,7 +1701,9 @@ export default function Invoice() {
                                         <input
                                           type="text"
                                           name={`batch-${fieldIndex}`}
-                                          value={entry.batches[fieldIndex]}
+                                          value={
+                                            entry.batches?.[fieldIndex] || ""
+                                          }
                                           onChange={(e) =>
                                             handleChange(
                                               entryIndex,
@@ -1349,6 +1727,8 @@ export default function Invoice() {
                       )}
 
                       {/* Kit Components Section */}
+                      {/* Kit Components Section with Dynamic Batches */}
+                      {/* Kit Components Section with Improved Layout */}
                       {entry.isKit &&
                         entry.kitData &&
                         entry.kitData.length > 0 && (
@@ -1356,29 +1736,9 @@ export default function Invoice() {
                             <div className="kit-components-header">
                               <h4>Kit Components:</h4>
                               <p className="kit-info">
-                                Enter quantities for each kit component
+                                Enter quantities for each kit component and
+                                batch
                               </p>
-                              {/* <button
-                                type="button"
-                                onClick={() => {
-                                  console.log(
-                                    "Testing kit detection for entry:",
-                                    entryIndex
-                                  )
-                                  console.log("Entry data:", entry)
-                                  console.log(
-                                    "PurchaseOrderDetails:",
-                                    purchaseOrderDetails
-                                  )
-                                }}
-                                style={{
-                                  fontSize: "0.8em",
-                                  padding: "2px 8px",
-                                  marginTop: "5px",
-                                }}
-                              >
-                                Debug Kit Data
-                              </button> */}
                             </div>
                             <div className="kit-components-container">
                               {entry.kitData.map((kitItem, kitIndex) => (
@@ -1386,75 +1746,31 @@ export default function Invoice() {
                                   key={kitIndex}
                                   className="kit-component-item"
                                 >
-                                  <div className="kit-component-header">
-                                    <strong>Component {kitIndex + 1}:</strong>{" "}
-                                    {kitItem.prod_desc}
-                                  </div>
-                                  <div className="kit-component-details">
-                                    <div className="kit-component-info">
-                                      {/* <span>PO Sl No: {kitItem.po_sl_no}</span> */}
-                                      {/* <span>
-                                        Unit Price: ₹{kitItem.unit_price}
-                                      </span>
-                                      <span>
-                                        Total amount: ₹
-                                        {Number(entry.unit_price).toFixed(2)} ×{" "}
-                                        {Number(entry.kitQuantity || 0)}= ₹
-                                        {(
-                                          Number(entry.unit_price) *
-                                          Number(entry.kitQuantity || 0)
-                                        ).toFixed(2)}
-                                      </span> */}
-                                      <span>
-                                        Pack Size: {kitItem.pack_size || "N/A"}
-                                      </span>
-                                      <span
-                                        className={`kit-component-balance ${getStockLevelClass(
-                                          kitItem.qty_balance
-                                        )}`}
-                                      >
-                                        Balance:{" "}
-                                        {formatBalance(kitItem.qty_balance)}{" "}
-                                        {getUOMWithFallback(kitItem)}
-                                        {kitItem.quantity &&
-                                          parseFloat(kitItem.quantity) > 0 && (
-                                            <span className="remaining-balance">
-                                              {" "}
-                                              (Remaining:{" "}
-                                              {getTotalRemainingBalance(
-                                                kitItem
-                                              )}
-                                              )
-                                            </span>
-                                          )}
-                                      </span>
+                                  {/* Component Header Row - Component Name, Number of Batches, and HSN/SAC in one line */}
+                                  <div className="kit-component-header-row">
+                                    <div className="kit-component-title">
+                                      <strong>Component {kitIndex + 1}:</strong>{" "}
+                                      {kitItem.prod_desc}
                                     </div>
-                                    <div className="kit-component-fields">
-                                      <div className="kit-component-quantity">
+                                    <div className="kit-component-controls">
+                                      <div className="batch-count-input">
                                         <input
                                           type="number"
-                                          name={`kit-quantity-${kitIndex}`}
-                                          value={kitItem.quantity || ""}
+                                          name={`kit-noOfBatches-${kitIndex}`}
+                                          min={1}
+                                          max={10}
+                                          value={kitItem.noOfBatches || 1}
                                           onChange={(e) =>
-                                            handleKitComponentQuantityChange(
+                                            handleKitComponentBatchCountChange(
                                               entryIndex,
                                               kitIndex,
                                               e.target.value
                                             )
                                           }
-                                          placeholder=" "
-                                          min="0"
-                                          step="0.01"
                                           onFocus={handleKitInputFocus}
-                                          onBlur={(e) =>
-                                            handleValidateKitInputBlur(
-                                              e,
-                                              entryIndex,
-                                              kitIndex
-                                            )
-                                          }
+                                          onBlur={handleKitInputBlur}
                                         />
-                                        <label>Quantity</label>
+                                        <label>Number of Batches</label>
                                       </div>
                                       <div className="kit-component-hsn">
                                         <input
@@ -1476,6 +1792,115 @@ export default function Invoice() {
                                         <label>HSN/SAC</label>
                                       </div>
                                     </div>
+                                  </div>
+
+                                  {/* Dynamic Batch Fields - Pack Size/Balance/Remaining on left, Quantity/Batch No. on right */}
+                                  <div className="kit-batches-container">
+                                    {kitItem.batches &&
+                                      kitItem.batches
+                                        .slice(0, kitItem.noOfBatches || 1)
+                                        .map((batch, batchIndex) => (
+                                          <div
+                                            key={batchIndex}
+                                            className="kit-batch-row"
+                                          >
+                                            <div className="kit-batch-header">
+                                              Batch {batchIndex + 1}
+                                            </div>
+
+                                            {/* Batch Information Row - Info on left, Input fields on right */}
+                                            <div className="kit-batch-content">
+                                              {/* Left side - Pack Size, Balance, Remaining */}
+                                              <div className="kit-batch-info-left">
+                                                <div className="kit-batch-info-item">
+                                                  <span className="info-label">
+                                                    Pack Size:
+                                                  </span>
+                                                  <span className="info-value">
+                                                    {batch.packSize}
+                                                  </span>
+                                                </div>
+                                                <div className="kit-batch-info-item">
+                                                  <span className="info-label">
+                                                    Balance:
+                                                  </span>
+                                                  <span className="info-value">
+                                                    {batch.balance}
+                                                  </span>
+                                                </div>
+                                                <div className="kit-batch-info-item">
+                                                  <span className="info-label">
+                                                    Remaining:
+                                                  </span>
+                                                  <span
+                                                    className={`info-value remaining-value ${getStockLevelClass(
+                                                      batch.remaining
+                                                    )}`}
+                                                  >
+                                                    {batch.remaining}
+                                                  </span>
+                                                </div>
+                                              </div>
+
+                                              {/* Right side - Quantity and Batch Number input fields */}
+                                              <div className="kit-batch-inputs-right">
+                                                <div className="kit-component-quantity">
+                                                  <input
+                                                    type="number"
+                                                    name={`kit-batch-quantity-${kitIndex}-${batchIndex}`}
+                                                    value={batch.quantity || ""}
+                                                    onChange={(e) =>
+                                                      handleKitBatchChange(
+                                                        entryIndex,
+                                                        kitIndex,
+                                                        batchIndex,
+                                                        "quantity",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    placeholder=" "
+                                                    min="0"
+                                                    step="0.01"
+                                                    onFocus={
+                                                      handleKitInputFocus
+                                                    }
+                                                    onBlur={(e) =>
+                                                      handleKitBatchQuantityBlur(
+                                                        e,
+                                                        entryIndex,
+                                                        kitIndex,
+                                                        batchIndex
+                                                      )
+                                                    }
+                                                  />
+                                                  <label>Quantity</label>
+                                                </div>
+                                                <div className="kit-component-quantity">
+                                                  <input
+                                                    type="text"
+                                                    name={`kit-batch-number-${kitIndex}-${batchIndex}`}
+                                                    value={batch.batchNo || ""}
+                                                    onChange={(e) =>
+                                                      handleKitBatchChange(
+                                                        entryIndex,
+                                                        kitIndex,
+                                                        batchIndex,
+                                                        "batchNo",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    placeholder=" "
+                                                    onFocus={
+                                                      handleKitInputFocus
+                                                    }
+                                                    onBlur={handleKitInputBlur}
+                                                  />
+                                                  <label>Batch No.</label>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
                                   </div>
                                 </div>
                               ))}

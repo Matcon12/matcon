@@ -159,8 +159,8 @@ export default function POTable({
           <td className="col3" colSpan={2}>
             Total:
           </td>
-          {/* <td className="col5">{total_qty}</td> */}
-          <td className="col5">{calculateTotalQuantity.toFixed(2)}</td>
+          <td className="col5">{total_qty.toFixed(2)}</td>
+          {/* <td className="col5">{calculateTotalQuantity.toFixed(2)}</td> */}
           <td className="col15"></td>
           <td className="col7"></td>
           <td className="col8">
