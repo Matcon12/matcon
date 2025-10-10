@@ -278,7 +278,7 @@ export default function UpdatePO() {
               setKitData(response.data.filtered_data)
               setIsKit(true)
             } else {
-              setKitData(null)
+              setKitData([])
               setIsKit(false)
             }
 
