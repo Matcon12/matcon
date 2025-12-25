@@ -1,45 +1,56 @@
-name: Build & Push to GHCR
+name: Deploy MATCON
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
-    permissions:
-      packages: write
-      contents: read
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+    # ---- Build React (optional) ----
+    # This builds React before deployment (faster deploy)
+    - name: Build React app
+      run: |
+        cd mat-frontend
+        npm install
+        npm run build
 
-      - name: Build & Push Frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./mat-frontend
-          push: true
-          tags: ghcr.io/gokulpr-47/mat-frontend:latest
+    # ---- Package all project files ----
+    - name: Create tar file
+      run: |
+        tar -czf matcon.tar.gz ./
 
-      - name: Build & Push Backend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./mat-backend
-          push: true
-          tags: ghcr.io/gokulpr-47/mat-backend:latest
+    # ---- Copy artifact to EC2 ----
+    - name: Copy files to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "matcon.tar.gz"
+        target: "${{ secrets.EC2_PROJECT_DIR }}"
 
-      - name: Build & Push Nginx
-        uses: docker/build-push-action@v6
-        with:
-          context: ./nginx
-          push: true
-          tags: ghcr.io/gokulpr-47/mat-nginx:latest
+    # ---- Run deployment on EC2 ----
+    - name: Execute on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd ${{ secrets.EC2_PROJECT_DIR }}
+          tar -xzf matcon.tar.gz
+
+          # Stop running containers
+          docker compose down
+
+          # Rebuild images
+          docker compose build --no-cache
+
+          # Start containers
+          docker compose up -d
