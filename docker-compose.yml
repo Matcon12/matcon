@@ -4,16 +4,15 @@ services:
   django:
     build:
       context: ./mat-backend
+      dockerfile: Dockerfile
     container_name: django_container
     expose:
       - "8000"
-    volumes:
-      - static_volume:/app/static
-      - media_volume:/app/media
 
   react:
     build:
       context: ./mat-frontend
+      dockerfile: Dockerfile
     container_name: react_container
     expose:
       - "80"
@@ -21,6 +20,7 @@ services:
   nginx:
     build:
       context: ./nginx
+      dockerfile: Dockerfile
     container_name: nginx_container
     ports:
       - "80:80"
@@ -29,10 +29,7 @@ services:
       - django
       - react
     volumes:
-      - static_volume:/app/static
-      - media_volume:/app/media
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/letsencrypt/live/mat.matcon.in:/etc/letsencrypt/live/mat.matcon.in:ro
+      - /etc/letsencrypt/archive/mat.matcon.in:/etc/letsencrypt/archive/mat.matcon.in:ro
+      - /home/matcon/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
-volumes:
-  static_volume:
-  media_volume:
