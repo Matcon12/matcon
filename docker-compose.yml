@@ -1,40 +1,38 @@
-version: "3.9"
+version: "3"
 
 services:
-  react:
-    image: ghcr.io/gokulpr-47/mat-frontend:latest
-    container_name: mat_frontend
-    restart: always
-    ports:
-      - "3000:80"
-
   django:
-    image: ghcr.io/gokulpr-47/mat-backend:latest
-    container_name: mat_backend
-    restart: always
-    ports:
-      - "8000:8000"
+    build:
+      context: ./mat-backend
+    container_name: django_container
+    expose:
+      - "8000"
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+
+  react:
+    build:
+      context: ./mat-frontend
+    container_name: react_container
+    expose:
+      - "80"
 
   nginx:
-    image: ghcr.io/gokulpr-47/mat-nginx:latest
-    container_name: mat_nginx
-    restart: always
+    build:
+      context: ./nginx
+    container_name: nginx_container
     ports:
       - "80:80"
       - "443:443"
     depends_on:
-      - react
       - django
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: always
+      - react
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/github/ghcr_token:/config/.dockerconfigjson:ro
-    command: >
-      --interval 30
-      --cleanup
-      --label-enable
-      --registry-auth
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+
+volumes:
+  static_volume:
+  media_volume:
